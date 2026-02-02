@@ -1,0 +1,52 @@
+{
+  "name": "@air-lock-ai/airlock-benchmark",
+  "version": "1.0.0",
+  "description": "Benchmark token savings of Airlock's meta-tools approach vs full tool expansion",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "airlock-benchmark": "./dist/cli.js"
+  },
+  "scripts": {
+    "benchmark": "tsx src/benchmark.ts",
+    "benchmark:json": "tsx src/benchmark.ts --format json",
+    "benchmark:markdown": "tsx src/benchmark.ts --format markdown",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "airlock",
+    "mcp",
+    "model-context-protocol",
+    "benchmark",
+    "tokens",
+    "llm",
+    "ai-agents"
+  ],
+  "author": "Air-Lock-AI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Air-Lock-AI/airlock-benchmark.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Air-Lock-AI/airlock-benchmark/issues"
+  },
+  "homepage": "https://github.com/Air-Lock-AI/airlock-benchmark#readme",
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "eslint": "^9.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.0.0"
+  },
+  "dependencies": {
+    "commander": "^12.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

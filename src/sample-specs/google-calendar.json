@@ -1,0 +1,103 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Google Calendar API",
+    "description": "Manage Google Calendar events",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://www.googleapis.com/calendar/v3"
+    }
+  ],
+  "paths": {
+    "/calendars/{calendarId}/events": {
+      "get": {
+        "operationId": "listEvents",
+        "summary": "List calendar events",
+        "description": "Returns events on the specified calendar",
+        "parameters": [
+          { "name": "calendarId", "in": "path", "required": true, "schema": { "type": "string", "default": "primary" } },
+          { "name": "timeMin", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "timeMax", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "maxResults", "in": "query", "schema": { "type": "integer", "default": 10 } },
+          { "name": "q", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "List of events" } }
+      },
+      "post": {
+        "operationId": "createEvent",
+        "summary": "Create a calendar event",
+        "description": "Creates an event on the specified calendar",
+        "parameters": [
+          { "name": "calendarId", "in": "path", "required": true, "schema": { "type": "string", "default": "primary" } },
+          { "name": "sendUpdates", "in": "query", "schema": { "type": "string", "enum": ["all", "externalOnly", "none"] } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "summary": { "type": "string" },
+                  "description": { "type": "string" },
+                  "location": { "type": "string" },
+                  "start": { "type": "object", "properties": { "dateTime": { "type": "string" }, "timeZone": { "type": "string" } } },
+                  "end": { "type": "object", "properties": { "dateTime": { "type": "string" }, "timeZone": { "type": "string" } } },
+                  "attendees": { "type": "array", "items": { "type": "object", "properties": { "email": { "type": "string" } } } }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Created event" } }
+      }
+    },
+    "/calendars/{calendarId}/events/{eventId}": {
+      "get": {
+        "operationId": "getEvent",
+        "summary": "Get a calendar event",
+        "parameters": [
+          { "name": "calendarId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "eventId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Event details" } }
+      },
+      "put": {
+        "operationId": "updateEvent",
+        "summary": "Update a calendar event",
+        "parameters": [
+          { "name": "calendarId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "eventId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "summary": { "type": "string" },
+                  "description": { "type": "string" },
+                  "start": { "type": "object" },
+                  "end": { "type": "object" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Updated event" } }
+      },
+      "delete": {
+        "operationId": "deleteEvent",
+        "summary": "Delete a calendar event",
+        "parameters": [
+          { "name": "calendarId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "eventId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "204": { "description": "Event deleted" } }
+      }
+    }
+  }
+}

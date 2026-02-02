@@ -1,0 +1,161 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Linear API",
+    "description": "Manage Linear issues, projects, and teams. This REST-like interface wraps Linear's GraphQL API for MCP tool integration.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://api.linear.app",
+      "description": "Linear API"
+    }
+  ],
+  "paths": {
+    "/issues": {
+      "get": {
+        "operationId": "list_issues",
+        "summary": "List issues",
+        "description": "Returns a list of issues from your Linear workspace. Supports filtering by assignee, project, team, and status.",
+        "parameters": [
+          { "name": "assigneeId", "in": "query", "schema": { "type": "string" } },
+          { "name": "projectId", "in": "query", "schema": { "type": "string" } },
+          { "name": "teamId", "in": "query", "schema": { "type": "string" } },
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["backlog", "unstarted", "started", "completed", "canceled"] } },
+          { "name": "first", "in": "query", "schema": { "type": "integer", "default": 50 } }
+        ],
+        "responses": { "200": { "description": "List of issues" } }
+      },
+      "post": {
+        "operationId": "create_issue",
+        "summary": "Create an issue",
+        "description": "Creates a new issue in Linear. Requires a title and team ID.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title", "teamId"],
+                "properties": {
+                  "title": { "type": "string" },
+                  "description": { "type": "string" },
+                  "teamId": { "type": "string" },
+                  "projectId": { "type": "string" },
+                  "assigneeId": { "type": "string" },
+                  "priority": { "type": "integer", "minimum": 0, "maximum": 4 }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Created issue" } }
+      }
+    },
+    "/issues/{issueId}": {
+      "get": {
+        "operationId": "get_issue",
+        "summary": "Get an issue",
+        "description": "Returns detailed information about a specific issue by its ID.",
+        "parameters": [
+          { "name": "issueId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Issue details" } }
+      },
+      "patch": {
+        "operationId": "update_issue",
+        "summary": "Update an issue",
+        "description": "Updates an existing issue.",
+        "parameters": [
+          { "name": "issueId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": { "type": "string" },
+                  "description": { "type": "string" },
+                  "stateId": { "type": "string" },
+                  "assigneeId": { "type": "string" },
+                  "priority": { "type": "integer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Updated issue" } }
+      }
+    },
+    "/issues/search": {
+      "get": {
+        "operationId": "search_issues",
+        "summary": "Search issues",
+        "description": "Searches for issues by text query across title and description.",
+        "parameters": [
+          { "name": "query", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "teamId", "in": "query", "schema": { "type": "string" } },
+          { "name": "first", "in": "query", "schema": { "type": "integer", "default": 25 } }
+        ],
+        "responses": { "200": { "description": "Search results" } }
+      }
+    },
+    "/issues/{issueId}/comments": {
+      "get": {
+        "operationId": "list_comments",
+        "summary": "List comments on an issue",
+        "parameters": [
+          { "name": "issueId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "List of comments" } }
+      },
+      "post": {
+        "operationId": "add_comment",
+        "summary": "Add a comment to an issue",
+        "parameters": [
+          { "name": "issueId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["body"],
+                "properties": {
+                  "body": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Created comment" } }
+      }
+    },
+    "/projects": {
+      "get": {
+        "operationId": "list_projects",
+        "summary": "List projects",
+        "description": "Returns a list of projects in your Linear workspace.",
+        "parameters": [
+          { "name": "teamId", "in": "query", "schema": { "type": "string" } },
+          { "name": "first", "in": "query", "schema": { "type": "integer", "default": 50 } }
+        ],
+        "responses": { "200": { "description": "List of projects" } }
+      }
+    },
+    "/teams": {
+      "get": {
+        "operationId": "list_teams",
+        "summary": "List teams",
+        "description": "Returns a list of teams in your Linear workspace.",
+        "parameters": [
+          { "name": "first", "in": "query", "schema": { "type": "integer", "default": 50 } }
+        ],
+        "responses": { "200": { "description": "List of teams" } }
+      }
+    }
+  }
+}
