@@ -248,32 +248,32 @@ function startCallbackServer(port: number): Promise<{ code: string; state: strin
         const error = url.searchParams.get('error');
 
         if (error) {
-          res.writeHead(400, { 'Content-Type': 'text/html' });
-          res.end(`
-            <html>
-              <body style="font-family: sans-serif; text-align: center; padding: 50px;">
-                <h1>❌ Authentication Failed</h1>
-                <p>Error: ${error}</p>
-                <p>You can close this window.</p>
-              </body>
-            </html>
-          `);
+          res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end(`<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Authentication Failed</title></head>
+<body style="font-family: sans-serif; text-align: center; padding: 50px;">
+  <h1 style="color: #dc3545;">Authentication Failed</h1>
+  <p>Error: ${error}</p>
+  <p>You can close this window.</p>
+</body>
+</html>`);
           server.close();
           reject(new Error(`OAuth error: ${error}`));
           return;
         }
 
         if (code && state) {
-          res.writeHead(200, { 'Content-Type': 'text/html' });
-          res.end(`
-            <html>
-              <body style="font-family: sans-serif; text-align: center; padding: 50px;">
-                <h1>✅ Authentication Successful</h1>
-                <p>You can close this window and return to the terminal.</p>
-                <script>window.close();</script>
-              </body>
-            </html>
-          `);
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end(`<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Authentication Successful</title></head>
+<body style="font-family: sans-serif; text-align: center; padding: 50px;">
+  <h1 style="color: #28a745;">Authentication Successful</h1>
+  <p>You can close this window and return to the terminal.</p>
+  <script>window.close();</script>
+</body>
+</html>`);
           server.close();
           resolve({ code, state });
         } else {
