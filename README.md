@@ -46,13 +46,15 @@ npm run benchmark
   TOTAL               :    457 tokens
 
 📊 Benchmark Results:
-----------------------------------------------------------------------------------------------------
-| Scenario                              | APIs | Tools | Meta    | Full      | Saved     | %     |
-|---------------------------------------|------|-------|---------|-----------|-----------|-------|
-| Single API (Linear)                   | 1    | 9     | 426     | 1,066     | 640       | 60.0% |
-| Single API (GitHub)                   | 1    | 18    | 426     | 2,847     | 2,421     | 85.0% |
-| Three APIs (typical org)              | 3    | 33    | 426     | 4,746     | 4,320     | 91.0% |
-| Large org (10 APIs)                   | 10   | 250+  | 426     | 35,000+   | 34,500+   | 98.8% |
+------------------------------------------------------------------------------------------------------------------------------
+| Scenario                              | APIs | Tools | Meta    | Full      | Saved     | %     | $/req   | $/user/mo |
+|---------------------------------------|------|-------|---------|-----------|-----------|-------|---------|-----------|
+| Single API (Linear)                   | 1    | 9     | 457     | 1,091     | 634       | 58.1% | $0.0019 | $1.90     |
+| Single API (GitHub)                   | 1    | 18    | 457     | 2,928     | 2,471     | 84.4% | $0.0074 | $7.41     |
+| Three APIs (typical org)              | 3    | 32    | 457     | 4,878     | 4,421     | 90.6% | $0.013  | $13.26    |
+| Large org (10 APIs)                   | 10   | 277   | 457     | 31,485    | 31,028    | 98.5% | $0.093  | $93.08    |
+
+*Based on ~1,000 requests/user/month and Claude Sonnet 4.5 pricing ($3/1M input tokens)*
 ```
 
 ## Output Formats
@@ -112,7 +114,7 @@ If OAuth fails (e.g., firewall blocking localhost), it falls back to manual toke
    Total: 32 tools
 
 📏 Token Measurements:
-   Meta-tool definitions:    426 tokens (constant)
+   Meta-tool definitions:    457 tokens (constant)
    list_services response:   180 tokens
    search_tools response:    250 tokens
    describe_tools response:  320 tokens
@@ -153,15 +155,17 @@ This benchmark accounts for the **full workflow overhead** of the meta-tools app
 
 Meta-tools workflow total: `(457 × 3) + 250 response tokens ≈ 1,621 tokens`
 
-| Scenario | Full Expansion | Meta-tools (fair) | Difference |
-|----------|----------------|-------------------|------------|
-| Single API (5 tools) | 859 | 1,621 | ❌ +762 (meta costs more) |
-| Single API (9 tools) | 1,091 | 1,621 | ❌ +530 (meta costs more) |
-| Single API (18 tools) | 2,928 | 1,621 | ✅ -1,307 (45% savings) |
-| Three APIs (32 tools) | 4,878 | 1,621 | ✅ -3,257 (67% savings) |
-| Medium org (122 tools) | 14,652 | 1,621 | ✅ -13,031 (89% savings) |
-| Large org (277 tools) | 31,485 | 1,621 | ✅ -29,864 (95% savings) |
-| Enterprise (865 tools) | 95,360 | 1,621 | ✅ -93,739 (98% savings) |
+| Scenario | Full Expansion | Meta-tools (fair) | Difference | $/req | $/user/mo |
+|----------|----------------|-------------------|------------|-------|-----------|
+| Single API (5 tools) | 859 | 1,621 | ❌ +762 (meta costs more) | -$0.002 | -$2.29 |
+| Single API (9 tools) | 1,091 | 1,621 | ❌ +530 (meta costs more) | -$0.002 | -$1.59 |
+| Single API (18 tools) | 2,928 | 1,621 | ✅ -1,307 (45% savings) | $0.004 | $3.92 |
+| Three APIs (32 tools) | 4,878 | 1,621 | ✅ -3,257 (67% savings) | $0.010 | $9.77 |
+| Medium org (122 tools) | 14,652 | 1,621 | ✅ -13,031 (89% savings) | $0.039 | $39.09 |
+| Large org (277 tools) | 31,485 | 1,621 | ✅ -29,864 (95% savings) | $0.090 | $89.59 |
+| Enterprise (865 tools) | 95,360 | 1,621 | ✅ -93,739 (98% savings) | $0.281 | $281.22 |
+
+*Based on ~1,000 requests/user/month and Claude Sonnet 4.5 pricing ($3/1M input tokens)*
 
 **Break-even point**: ~12-15 total tools (typically 2 APIs)
 
