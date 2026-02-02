@@ -84,23 +84,38 @@ The benchmark automatically loads all `.json` files from the `sample-specs` dire
 This benchmark accounts for the **full workflow overhead** of the meta-tools approach:
 
 **Meta-tools workflow** (3 API calls):
-1. `search_tools("create issue")` → returns matching tools
-2. `describe_tools(["linear/create_issue"])` → returns full schema
+1. `search_tools("create issue")` → returns matching tools (~150 tokens)
+2. `describe_tools(["linear/create_issue"])` → returns full schema (~100 tokens)
 3. `execute_tool("linear/create_issue", {...})` → executes
 
 **Full expansion workflow** (1 API call):
 1. Direct tool call → executes
 
-Even with this overhead, meta-tools saves **90%+ tokens** for organizations with 3+ APIs.
+### Overhead Calculation
+
+Meta-tools workflow total: `(426 × 3) + 250 response tokens ≈ 1,528 tokens`
+
+| Scenario | Full Expansion | Meta-tools (fair) | Difference |
+|----------|----------------|-------------------|------------|
+| Single API (5 tools) | 750 | 1,528 | ❌ +778 (meta costs more) |
+| Single API (9 tools) | 936 | 1,528 | ❌ +592 (meta costs more) |
+| Single API (18 tools) | 2,480 | 1,528 | ✅ -952 (38% savings) |
+| Three APIs (32 tools) | 4,166 | 1,528 | ✅ -2,638 (63% savings) |
+| Medium org (122 tools) | 12,248 | 1,528 | ✅ -10,720 (88% savings) |
+| Large org (277 tools) | 26,167 | 1,528 | ✅ -24,639 (94% savings) |
+| Enterprise (865 tools) | 79,019 | 1,528 | ✅ -77,491 (98% savings) |
+
+**Break-even point**: ~15-20 total tools (typically 2 APIs)
 
 ## When to Use Each Approach
 
-| Scenario | Recommendation |
-|----------|----------------|
-| Single API with <10 tools | Full expansion acceptable |
-| 2-3 APIs | Meta-tools starts winning |
-| 5+ APIs | Meta-tools clearly better |
-| Enterprise (10+ APIs) | Meta-tools essential |
+| Scenario | Tools | Recommendation | Fair Comparison |
+|----------|-------|----------------|-----------------|
+| Single small API | <10 | Full expansion | Meta costs ~600 more tokens |
+| Single medium API | 10-20 | Either works | Roughly break-even |
+| 2-3 APIs | 20-40 | Meta-tools | Saves 50-70% |
+| 5+ APIs | 50-150 | Meta-tools | Saves 80-90% |
+| Enterprise (10+ APIs) | 200+ | Meta-tools essential | Saves 95%+ |
 
 ## How It Works
 
