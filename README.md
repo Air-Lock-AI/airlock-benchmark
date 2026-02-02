@@ -73,7 +73,7 @@ npm run benchmark:markdown
 Measure actual token usage against your real Airlock organization:
 
 ```bash
-# Interactive authentication (opens browser, prompts for token)
+# Interactive authentication (opens browser for OAuth sign-in)
 npm run benchmark:live -- --org my-org
 
 # With token provided directly
@@ -199,8 +199,8 @@ Contributions welcome! Ideas:
 
 - Add more sample API specs
 - Integrate tiktoken for exact token counts
-- Add live benchmark against real Airlock instance
 - Visualization/charts
+- Performance benchmarks (latency comparison)
 
 ## Related
 
