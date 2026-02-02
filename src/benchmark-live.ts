@@ -15,6 +15,7 @@ import { createInterface } from 'readline';
 import { exec } from 'child_process';
 import { createServer, type IncomingMessage, type ServerResponse } from 'http';
 import { randomBytes } from 'crypto';
+import { countTokens, freeEncoder } from './token-counter.js';
 
 // ============================================================================
 // Types
@@ -90,26 +91,8 @@ interface LiveBenchmarkResult {
   };
 }
 
-// ============================================================================
-// Token Counting
-// ============================================================================
-
-function countTokens(text: string): number {
-  const structuralChars = (text.match(/[{}\[\]:,"]/g) || []).length;
-  const words = text
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .replace(/[^a-zA-Z0-9\s]/g, ' ')
-    .split(/\s+/)
-    .filter((w) => w.length > 0);
-
-  const estimate = Math.ceil(structuralChars * 0.5 + words.length * 1.3);
-  const simpleEstimate = Math.ceil(text.length / 4);
-
-  return Math.ceil((estimate + simpleEstimate) / 2);
-}
-
-// Meta-tools token count (constant)
-const META_TOOLS_TOKENS = 426;
+// Meta-tools token count (measured with tiktoken cl100k_base)
+const META_TOOLS_TOKENS = 457;
 
 // ============================================================================
 // OAuth Authentication
@@ -786,6 +769,8 @@ async function main(): Promise<void> {
   } catch (error) {
     console.error('\n❌ Benchmark failed:', error instanceof Error ? error.message : error);
     process.exit(1);
+  } finally {
+    freeEncoder();
   }
 }
 

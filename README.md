@@ -38,12 +38,12 @@ npm run benchmark
 ```
 📦 Meta-Tools (4 tools):
 --------------------------------------------------
-  list_services       :     60 tokens
-  search_tools        :    123 tokens
-  describe_tools      :    112 tokens
-  execute_tool        :    131 tokens
+  list_services       :     63 tokens
+  search_tools        :    130 tokens
+  describe_tools      :    120 tokens
+  execute_tool        :    144 tokens
 --------------------------------------------------
-  TOTAL               :    426 tokens
+  TOTAL               :    457 tokens
 
 📊 Benchmark Results:
 ----------------------------------------------------------------------------------------------------
@@ -151,19 +151,19 @@ This benchmark accounts for the **full workflow overhead** of the meta-tools app
 
 ### Overhead Calculation
 
-Meta-tools workflow total: `(426 × 3) + 250 response tokens ≈ 1,528 tokens`
+Meta-tools workflow total: `(457 × 3) + 250 response tokens ≈ 1,621 tokens`
 
 | Scenario | Full Expansion | Meta-tools (fair) | Difference |
 |----------|----------------|-------------------|------------|
-| Single API (5 tools) | 750 | 1,528 | ❌ +778 (meta costs more) |
-| Single API (9 tools) | 936 | 1,528 | ❌ +592 (meta costs more) |
-| Single API (18 tools) | 2,480 | 1,528 | ✅ -952 (38% savings) |
-| Three APIs (32 tools) | 4,166 | 1,528 | ✅ -2,638 (63% savings) |
-| Medium org (122 tools) | 12,248 | 1,528 | ✅ -10,720 (88% savings) |
-| Large org (277 tools) | 26,167 | 1,528 | ✅ -24,639 (94% savings) |
-| Enterprise (865 tools) | 79,019 | 1,528 | ✅ -77,491 (98% savings) |
+| Single API (5 tools) | 859 | 1,621 | ❌ +762 (meta costs more) |
+| Single API (9 tools) | 1,091 | 1,621 | ❌ +530 (meta costs more) |
+| Single API (18 tools) | 2,928 | 1,621 | ✅ -1,307 (45% savings) |
+| Three APIs (32 tools) | 4,878 | 1,621 | ✅ -3,257 (67% savings) |
+| Medium org (122 tools) | 14,652 | 1,621 | ✅ -13,031 (89% savings) |
+| Large org (277 tools) | 31,485 | 1,621 | ✅ -29,864 (95% savings) |
+| Enterprise (865 tools) | 95,360 | 1,621 | ✅ -93,739 (98% savings) |
 
-**Break-even point**: ~15-20 total tools (typically 2 APIs)
+**Break-even point**: ~12-15 total tools (typically 2 APIs)
 
 ## When to Use Each Approach
 
@@ -179,12 +179,7 @@ Meta-tools workflow total: `(426 × 3) + 250 response tokens ≈ 1,528 tokens`
 
 ### Token Counting
 
-The benchmark uses a heuristic approximation of the cl100k_base tokenizer:
-- Counts JSON structural characters
-- Counts words (splitting camelCase)
-- Averages with chars/4 estimate
-
-For production accuracy, consider using [tiktoken](https://github.com/openai/tiktoken).
+The benchmark uses [tiktoken](https://github.com/openai/tiktoken) with the `cl100k_base` encoding for accurate token counts. This is the same tokenizer used by GPT-4 and similar models.
 
 ### Tool Schema Generation
 
@@ -198,7 +193,6 @@ OpenAPI specs are converted to MCP tool schemas:
 Contributions welcome! Ideas:
 
 - Add more sample API specs
-- Integrate tiktoken for exact token counts
 - Visualization/charts
 - Performance benchmarks (latency comparison)
 

@@ -13,6 +13,7 @@
 import { readFileSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { countTokens, countToolTokens, freeEncoder } from './token-counter.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -57,33 +58,6 @@ interface BenchmarkResult {
   fullExpansionTokens: number;
   tokensSaved: number;
   percentageSaved: number;
-}
-
-// ============================================================================
-// Token Counting
-// ============================================================================
-
-/**
- * Approximate token count using cl100k_base tokenizer heuristics.
- * For production use, consider using tiktoken for exact counts.
- */
-function countTokens(text: string): number {
-  const structuralChars = (text.match(/[{}\[\]:,"]/g) || []).length;
-  const words = text
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .replace(/[^a-zA-Z0-9\s]/g, ' ')
-    .split(/\s+/)
-    .filter((w) => w.length > 0);
-
-  const estimate = Math.ceil(structuralChars * 0.5 + words.length * 1.3);
-  const simpleEstimate = Math.ceil(text.length / 4);
-
-  return Math.ceil((estimate + simpleEstimate) / 2);
-}
-
-function countToolTokens(tool: MCPTool): number {
-  const toolJson = JSON.stringify(tool, null, 2);
-  return countTokens(toolJson);
 }
 
 // ============================================================================
@@ -549,6 +523,9 @@ function main(): void {
   );
 
   printResults(results, format);
+
+  // Clean up tiktoken encoder
+  freeEncoder();
 }
 
 main();
