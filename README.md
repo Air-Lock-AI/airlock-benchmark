@@ -74,16 +74,16 @@ Measure actual token usage against your real Airlock organization:
 
 ```bash
 # Interactive authentication (opens browser, prompts for token)
-npm run benchmark:live -- --org-slug my-org
+npm run benchmark:live -- --org my-org
 
 # With token provided directly
-npm run benchmark:live -- --org-slug my-org --token $MCP_TOKEN
+npm run benchmark:live -- --org my-org --token $MCP_TOKEN
 
 # Using staging environment
-npm run benchmark:live -- --org-slug my-org --env staging
+npm run benchmark:live -- --org my-org --env staging
 
 # Output as JSON
-npm run benchmark:live -- --org-slug my-org --format json
+npm run benchmark:live -- --org my-org --format json
 ```
 
 ### Authentication

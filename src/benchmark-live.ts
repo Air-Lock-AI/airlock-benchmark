@@ -6,8 +6,8 @@
  * to provide accurate token comparisons.
  *
  * Usage:
- *   npx tsx src/benchmark-live.ts --org-slug <slug>
- *   npx tsx src/benchmark-live.ts --org-slug <slug> --token <mcp-token>
+ *   npx tsx src/benchmark-live.ts --org <slug>
+ *   npx tsx src/benchmark-live.ts --org <slug> --token <mcp-token>
  */
 
 import { parseArgs } from 'util';
@@ -688,12 +688,12 @@ function printUsage(): void {
 Airlock Live Benchmark - Measure actual token usage against your Airlock instance
 
 Usage:
-  npx tsx src/benchmark-live.ts --org-slug <slug>
-  npx tsx src/benchmark-live.ts --org-slug <slug> --token <token>
+  npx tsx src/benchmark-live.ts --org <slug>
+  npx tsx src/benchmark-live.ts --org <slug> --token <token>
 
 Options:
-  --org-slug <slug>   Your Airlock organization slug (required)
-  --url <url>         Full MCP endpoint URL (alternative to --org-slug)
+  --org <slug>   Your Airlock organization slug (required)
+  --url <url>         Full MCP endpoint URL (alternative to --org)
   --token <token>     Your MCP access token (will prompt if not provided)
   --env <env>         Environment: production (default), staging, or dev
   --format <format>   Output format: terminal (default) or json
@@ -701,13 +701,13 @@ Options:
 
 Examples:
   # Interactive authentication (will open browser)
-  npx tsx src/benchmark-live.ts --org-slug my-org
+  npx tsx src/benchmark-live.ts --org my-org
 
   # With token provided directly
-  npx tsx src/benchmark-live.ts --org-slug my-org --token abc123
+  npx tsx src/benchmark-live.ts --org my-org --token abc123
 
   # Using staging environment
-  npx tsx src/benchmark-live.ts --org-slug my-org --env staging
+  npx tsx src/benchmark-live.ts --org my-org --env staging
 
   # Using full URL
   npx tsx src/benchmark-live.ts --url https://mcp.air-lock.ai/org/my-org --token abc123
@@ -722,7 +722,7 @@ Environment URLs:
 async function main(): Promise<void> {
   const { values } = parseArgs({
     options: {
-      'org-slug': { type: 'string' },
+      org: { type: 'string' },
       url: { type: 'string' },
       token: { type: 'string' },
       env: { type: 'string', default: 'production' },
@@ -743,8 +743,8 @@ async function main(): Promise<void> {
   if (values.url) {
     url = values.url;
     orgSlug = url.match(/\/org\/([^/?]+)/)?.[1] || 'unknown';
-  } else if (values['org-slug']) {
-    orgSlug = values['org-slug'];
+  } else if (values.org) {
+    orgSlug = values.org;
 
     switch (env) {
       case 'production':
@@ -758,7 +758,7 @@ async function main(): Promise<void> {
         url = `https://mcp.${env}.dev.air-lock.ai/org/${orgSlug}`;
     }
   } else {
-    console.error('Error: Either --org-slug or --url is required\n');
+    console.error('Error: Either --org or --url is required\n');
     printUsage();
     process.exit(1);
   }
