@@ -11,6 +11,7 @@
     "benchmark": "tsx src/benchmark.ts",
     "benchmark:json": "tsx src/benchmark.ts --format json",
     "benchmark:markdown": "tsx src/benchmark.ts --format markdown",
+    "benchmark:live": "tsx src/benchmark-live.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",

@@ -68,6 +68,57 @@ npm run benchmark:json
 npm run benchmark:markdown
 ```
 
+## Live Benchmark (Against Your Airlock Instance)
+
+Measure actual token usage against your real Airlock organization:
+
+```bash
+# Using your org slug (production)
+npm run benchmark:live -- --org-slug my-org --token $MCP_TOKEN
+
+# Using staging environment
+npm run benchmark:live -- --org-slug my-org --token $MCP_TOKEN --env staging
+
+# Using a custom URL
+npm run benchmark:live -- --url https://mcp.air-lock.ai/org/my-org --token $MCP_TOKEN
+
+# Output as JSON
+npm run benchmark:live -- --org-slug my-org --token $MCP_TOKEN --format json
+```
+
+### Getting Your MCP Token
+
+1. Go to your [Airlock Dashboard](https://www.air-lock.ai)
+2. Navigate to any project → Connection tab
+3. Copy the MCP access token
+
+### Live Benchmark Output
+
+```
+📊 Organization: my-org
+   Timestamp: 2024-01-15T10:30:00.000Z
+
+📦 Services (3):
+   • Linear: 9 tools
+   • GitHub: 18 tools
+   • Google Calendar: 5 tools
+   Total: 32 tools
+
+📏 Token Measurements:
+   Meta-tool definitions:    426 tokens (constant)
+   list_services response:   180 tokens
+   search_tools response:    250 tokens
+   describe_tools response:  320 tokens
+   Full expansion estimate:  4,480 tokens
+
+⚖️  Fair Comparison:
+   Meta-tools workflow:  2,028 tokens
+   Full expansion:       4,480 tokens
+   Savings:              2,452 tokens (54.7%)
+
+💡 🟢 Meta-tools recommended - good savings
+```
+
 ## Using Your Own OpenAPI Specs
 
 Add your OpenAPI specs (JSON format) to `src/sample-specs/`:
