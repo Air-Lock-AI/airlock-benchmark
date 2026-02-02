@@ -58,7 +58,15 @@ interface BenchmarkResult {
   fullExpansionTokens: number;
   tokensSaved: number;
   percentageSaved: number;
+  costSavedPerReq: number; // Cost savings in dollars (per request)
+  monthlySaved: number; // Monthly cost savings in dollars
 }
+
+// Cost per 1M input tokens (Claude Sonnet 4.5 pricing)
+const COST_PER_MILLION_TOKENS = 3.0;
+
+// Estimated monthly requests per user (~50 requests/day × 20 working days)
+const MONTHLY_REQUESTS_PER_USER = 1_000;
 
 // ============================================================================
 // Meta-Tools Definition
@@ -302,6 +310,8 @@ function runBenchmark(
 
   const tokensSaved = fullExpansionTokens - metaToolsTokens;
   const percentageSaved = fullExpansionTokens > 0 ? (tokensSaved / fullExpansionTokens) * 100 : 0;
+  const costSavedPerReq = (tokensSaved / 1_000_000) * COST_PER_MILLION_TOKENS;
+  const monthlySaved = costSavedPerReq * MONTHLY_REQUESTS_PER_USER;
 
   return {
     scenario,
@@ -311,6 +321,8 @@ function runBenchmark(
     fullExpansionTokens,
     tokensSaved,
     percentageSaved,
+    costSavedPerReq,
+    monthlySaved,
   };
 }
 
@@ -324,6 +336,24 @@ function formatNumber(n: number): string {
 
 function formatPercent(n: number): string {
   return n.toFixed(1) + '%';
+}
+
+function formatCost(tokens: number): string {
+  const cost = (tokens / 1_000_000) * COST_PER_MILLION_TOKENS;
+  if (cost < 0.01) {
+    return '$' + cost.toFixed(4);
+  }
+  return '$' + cost.toFixed(3);
+}
+
+function formatMonthlyCost(dollars: number): string {
+  if (dollars >= 1000) {
+    return '$' + (dollars / 1000).toFixed(1) + 'k';
+  }
+  if (dollars >= 1) {
+    return '$' + dollars.toFixed(0);
+  }
+  return '$' + dollars.toFixed(2);
 }
 
 function printResults(results: BenchmarkResult[], format: 'terminal' | 'json' | 'markdown'): void {
@@ -359,7 +389,7 @@ function printTerminal(results: BenchmarkResult[]): void {
 
   // Results table
   console.log('\n📊 Benchmark Results:');
-  console.log('-'.repeat(100));
+  console.log('-'.repeat(126));
   console.log(
     '| Scenario'.padEnd(40) +
       '| APIs'.padEnd(7) +
@@ -368,9 +398,11 @@ function printTerminal(results: BenchmarkResult[]): void {
       '| Full'.padEnd(12) +
       '| Saved'.padEnd(12) +
       '| %'.padEnd(8) +
+      '| $/req'.padEnd(10) +
+      '| $/user/mo'.padEnd(12) +
       '|'
   );
-  console.log('|' + '-'.repeat(38) + '|' + '-'.repeat(5) + '|' + '-'.repeat(6) + '|' + '-'.repeat(8) + '|' + '-'.repeat(10) + '|' + '-'.repeat(10) + '|' + '-'.repeat(6) + '|');
+  console.log('|' + '-'.repeat(38) + '|' + '-'.repeat(5) + '|' + '-'.repeat(6) + '|' + '-'.repeat(8) + '|' + '-'.repeat(10) + '|' + '-'.repeat(10) + '|' + '-'.repeat(6) + '|' + '-'.repeat(8) + '|' + '-'.repeat(10) + '|');
 
   for (const r of results) {
     console.log(
@@ -388,10 +420,14 @@ function printTerminal(results: BenchmarkResult[]): void {
         formatNumber(r.tokensSaved).padEnd(9) +
         '| ' +
         formatPercent(r.percentageSaved).padEnd(5) +
+        '| ' +
+        formatCost(r.tokensSaved).padEnd(7) +
+        '| ' +
+        formatMonthlyCost(r.monthlySaved).padEnd(9) +
         '|'
     );
   }
-  console.log('-'.repeat(100));
+  console.log('-'.repeat(126));
 
   // Fair comparison
   console.log('\n⚖️  Fair Comparison (including meta-tools workflow overhead):');
@@ -446,11 +482,12 @@ function printMarkdown(results: BenchmarkResult[]): void {
   console.log(`| **TOTAL** | **${totalMetaTokens}** |\n`);
 
   console.log('## Benchmark Results\n');
-  console.log('| Scenario | APIs | Tools | Meta Tokens | Full Tokens | Saved | % Saved |');
-  console.log('|----------|------|-------|-------------|-------------|-------|---------|');
+  console.log('*Based on ~1,000 requests/user/month and Claude Sonnet 4.5 pricing ($3/1M input tokens)*\n');
+  console.log('| Scenario | APIs | Tools | Meta Tokens | Full Tokens | Saved | % Saved | $/req | $/user/mo |');
+  console.log('|----------|------|-------|-------------|-------------|-------|---------|-------|-----------|');
   for (const r of results) {
     console.log(
-      `| ${r.scenario} | ${r.projectCount} | ${r.totalTools} | ${formatNumber(r.metaToolsTokens)} | ${formatNumber(r.fullExpansionTokens)} | ${formatNumber(r.tokensSaved)} | ${formatPercent(r.percentageSaved)} |`
+      `| ${r.scenario} | ${r.projectCount} | ${r.totalTools} | ${formatNumber(r.metaToolsTokens)} | ${formatNumber(r.fullExpansionTokens)} | ${formatNumber(r.tokensSaved)} | ${formatPercent(r.percentageSaved)} | ${formatCost(r.tokensSaved)} | ${formatMonthlyCost(r.monthlySaved)} |`
     );
   }
 
