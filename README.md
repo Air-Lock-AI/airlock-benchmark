@@ -1,6 +1,6 @@
 # Airlock Meta-Tools Benchmark
 
-Benchmark token savings of [Airlock's](https://air-lock.ai) **meta-tools approach** vs traditional **full tool expansion** for MCP (Model Context Protocol) servers.
+Benchmark token savings of [Airlock's](https://www.air-lock.ai) **meta-tools approach** vs traditional **full tool expansion** for MCP (Model Context Protocol) servers.
 
 ## Background
 
@@ -131,7 +131,7 @@ Contributions welcome! Ideas:
 
 ## Related
 
-- [Airlock](https://air-lock.ai) - MCP server generator from OpenAPI specs
+- [Airlock](https://www.air-lock.ai) - MCP server generator from OpenAPI specs
 - [Model Context Protocol](https://modelcontextprotocol.io) - Open protocol for AI tool use
 - [Anthropic Claude](https://claude.ai) - AI assistant that uses MCP
 
