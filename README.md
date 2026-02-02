@@ -114,7 +114,7 @@ If OAuth fails (e.g., firewall blocking localhost), it falls back to manual toke
    Total: 32 tools
 
 📏 Token Measurements:
-   Meta-tool definitions:    426 tokens (constant)
+   Meta-tool definitions:    457 tokens (constant)
    list_services response:   180 tokens
    search_tools response:    250 tokens
    describe_tools response:  320 tokens
