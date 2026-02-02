@@ -73,24 +73,28 @@ npm run benchmark:markdown
 Measure actual token usage against your real Airlock organization:
 
 ```bash
-# Using your org slug (production)
+# Interactive authentication (opens browser, prompts for token)
+npm run benchmark:live -- --org-slug my-org
+
+# With token provided directly
 npm run benchmark:live -- --org-slug my-org --token $MCP_TOKEN
 
 # Using staging environment
-npm run benchmark:live -- --org-slug my-org --token $MCP_TOKEN --env staging
-
-# Using a custom URL
-npm run benchmark:live -- --url https://mcp.air-lock.ai/org/my-org --token $MCP_TOKEN
+npm run benchmark:live -- --org-slug my-org --env staging
 
 # Output as JSON
-npm run benchmark:live -- --org-slug my-org --token $MCP_TOKEN --format json
+npm run benchmark:live -- --org-slug my-org --format json
 ```
 
-### Getting Your MCP Token
+### Authentication
 
-1. Go to your [Airlock Dashboard](https://www.air-lock.ai)
-2. Navigate to any project → Connection tab
-3. Copy the MCP access token
+When you run the benchmark without a `--token`, it will:
+
+1. Open your browser to the Airlock dashboard
+2. Show instructions to copy your MCP token
+3. Prompt you to paste the token (input is hidden)
+
+Alternatively, pass `--token` directly if you already have it.
 
 ### Live Benchmark Output
 

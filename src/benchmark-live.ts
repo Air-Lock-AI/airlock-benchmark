@@ -6,11 +6,13 @@
  * to provide accurate token comparisons.
  *
  * Usage:
+ *   npx tsx src/benchmark-live.ts --org-slug <slug>
  *   npx tsx src/benchmark-live.ts --org-slug <slug> --token <mcp-token>
- *   npx tsx src/benchmark-live.ts --url <full-mcp-url> --token <mcp-token>
  */
 
 import { parseArgs } from 'util';
+import { createInterface } from 'readline';
+import { exec } from 'child_process';
 
 // ============================================================================
 // Types
@@ -106,6 +108,124 @@ function countTokens(text: string): number {
 
 // Meta-tools token count (constant)
 const META_TOOLS_TOKENS = 426;
+
+// ============================================================================
+// Interactive Authentication
+// ============================================================================
+
+function openBrowser(url: string): void {
+  const platform = process.platform;
+  let command: string;
+
+  switch (platform) {
+    case 'darwin':
+      command = `open "${url}"`;
+      break;
+    case 'win32':
+      command = `start "" "${url}"`;
+      break;
+    default:
+      command = `xdg-open "${url}"`;
+  }
+
+  exec(command, (error) => {
+    if (error) {
+      console.log(`\n   Could not open browser automatically.`);
+      console.log(`   Please open this URL manually: ${url}\n`);
+    }
+  });
+}
+
+function prompt(question: string, hidden = false): Promise<string> {
+  const rl = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  return new Promise((resolve) => {
+    if (hidden && process.stdin.isTTY) {
+      // For hidden input (like tokens), we'll still show it but mention it's sensitive
+      process.stdout.write(question);
+      let input = '';
+
+      process.stdin.setRawMode(true);
+      process.stdin.resume();
+      process.stdin.setEncoding('utf8');
+
+      const onData = (char: string) => {
+        switch (char) {
+          case '\n':
+          case '\r':
+          case '\u0004': // Ctrl+D
+            process.stdin.setRawMode(false);
+            process.stdin.pause();
+            process.stdin.removeListener('data', onData);
+            process.stdout.write('\n');
+            rl.close();
+            resolve(input);
+            break;
+          case '\u0003': // Ctrl+C
+            process.exit(1);
+            break;
+          case '\u007F': // Backspace
+            if (input.length > 0) {
+              input = input.slice(0, -1);
+              process.stdout.clearLine(0);
+              process.stdout.cursorTo(0);
+              process.stdout.write(question + '*'.repeat(input.length));
+            }
+            break;
+          default:
+            input += char;
+            process.stdout.write('*');
+        }
+      };
+
+      process.stdin.on('data', onData);
+    } else {
+      rl.question(question, (answer) => {
+        rl.close();
+        resolve(answer);
+      });
+    }
+  });
+}
+
+async function interactiveAuth(orgSlug: string, env: string): Promise<string> {
+  console.log('\n🔐 Interactive Authentication\n');
+  console.log('   To run the benchmark, you need an MCP access token from Airlock.');
+  console.log('   Opening your browser to the Airlock dashboard...\n');
+
+  // Determine the dashboard URL based on environment
+  let dashboardUrl: string;
+  switch (env) {
+    case 'production':
+      dashboardUrl = 'https://www.air-lock.ai/servers';
+      break;
+    case 'staging':
+      dashboardUrl = 'https://control-room.staging.air-lock.ai/servers';
+      break;
+    default:
+      dashboardUrl = `https://${env}.dev.air-lock.ai/servers`;
+  }
+
+  openBrowser(dashboardUrl);
+
+  console.log('   📋 Instructions:');
+  console.log('   1. Sign in to Airlock (if not already signed in)');
+  console.log('   2. Select any project in your organization');
+  console.log('   3. Go to the "Connection" tab');
+  console.log('   4. Copy the "MCP Access Token"\n');
+
+  const token = await prompt('   Paste your MCP token here: ', true);
+
+  if (!token || token.trim().length === 0) {
+    throw new Error('No token provided');
+  }
+
+  console.log('\n   ✓ Token received\n');
+  return token.trim();
+}
 
 // ============================================================================
 // MCP Client
@@ -342,23 +462,26 @@ function printUsage(): void {
 Airlock Live Benchmark - Measure actual token usage against your Airlock instance
 
 Usage:
+  npx tsx src/benchmark-live.ts --org-slug <slug>
   npx tsx src/benchmark-live.ts --org-slug <slug> --token <token>
-  npx tsx src/benchmark-live.ts --url <full-url> --token <token>
 
 Options:
-  --org-slug <slug>   Your Airlock organization slug
+  --org-slug <slug>   Your Airlock organization slug (required)
   --url <url>         Full MCP endpoint URL (alternative to --org-slug)
-  --token <token>     Your MCP access token
+  --token <token>     Your MCP access token (will prompt if not provided)
   --env <env>         Environment: production (default), staging, or dev
   --format <format>   Output format: terminal (default) or json
   --help              Show this help message
 
 Examples:
-  # Using org slug (production)
+  # Interactive authentication (will open browser)
+  npx tsx src/benchmark-live.ts --org-slug my-org
+
+  # With token provided directly
   npx tsx src/benchmark-live.ts --org-slug my-org --token abc123
 
-  # Using org slug (staging)
-  npx tsx src/benchmark-live.ts --org-slug my-org --token abc123 --env staging
+  # Using staging environment
+  npx tsx src/benchmark-live.ts --org-slug my-org --env staging
 
   # Using full URL
   npx tsx src/benchmark-live.ts --url https://mcp.air-lock.ai/org/my-org --token abc123
@@ -387,30 +510,26 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  if (!values.token) {
-    console.error('Error: --token is required\n');
-    printUsage();
-    process.exit(1);
-  }
-
+  const env = values.env || 'production';
   let url: string;
+  let orgSlug: string;
 
   if (values.url) {
     url = values.url;
+    orgSlug = url.match(/\/org\/([^/?]+)/)?.[1] || 'unknown';
   } else if (values['org-slug']) {
-    const slug = values['org-slug'];
-    const env = values.env || 'production';
+    orgSlug = values['org-slug'];
 
     switch (env) {
       case 'production':
-        url = `https://mcp.air-lock.ai/org/${slug}`;
+        url = `https://mcp.air-lock.ai/org/${orgSlug}`;
         break;
       case 'staging':
-        url = `https://mcp.staging.air-lock.ai/org/${slug}`;
+        url = `https://mcp.staging.air-lock.ai/org/${orgSlug}`;
         break;
       default:
         // Dev environment - env is the stage name
-        url = `https://mcp.${env}.dev.air-lock.ai/org/${slug}`;
+        url = `https://mcp.${env}.dev.air-lock.ai/org/${orgSlug}`;
     }
   } else {
     console.error('Error: Either --org-slug or --url is required\n');
@@ -418,10 +537,22 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  // Get token - either from args or interactively
+  let token = values.token;
+
+  if (!token) {
+    try {
+      token = await interactiveAuth(orgSlug, env);
+    } catch (error) {
+      console.error('\n❌ Authentication failed:', error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  }
+
   const format = (values.format as 'terminal' | 'json') || 'terminal';
 
   try {
-    const result = await runLiveBenchmark(url, values.token);
+    const result = await runLiveBenchmark(url, token);
     printResult(result, format);
   } catch (error) {
     console.error('\n❌ Benchmark failed:', error instanceof Error ? error.message : error);
