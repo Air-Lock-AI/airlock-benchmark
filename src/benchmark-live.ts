@@ -13,6 +13,8 @@
 import { parseArgs } from 'util';
 import { createInterface } from 'readline';
 import { exec } from 'child_process';
+import { createServer, type IncomingMessage, type ServerResponse } from 'http';
+import { randomBytes } from 'crypto';
 
 // ============================================================================
 // Types
@@ -110,8 +112,30 @@ function countTokens(text: string): number {
 const META_TOOLS_TOKENS = 426;
 
 // ============================================================================
-// Interactive Authentication
+// OAuth Authentication
 // ============================================================================
+
+interface OAuthMetadata {
+  issuer: string;
+  authorization_endpoint: string;
+  token_endpoint: string;
+  registration_endpoint?: string;
+  response_types_supported: string[];
+  code_challenge_methods_supported?: string[];
+}
+
+interface OAuthClientRegistration {
+  client_id: string;
+  client_secret?: string;
+  redirect_uris: string[];
+}
+
+interface OAuthTokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in?: number;
+  refresh_token?: string;
+}
 
 function openBrowser(url: string): void {
   const platform = process.platform;
@@ -136,6 +160,219 @@ function openBrowser(url: string): void {
   });
 }
 
+function generateCodeVerifier(): string {
+  return randomBytes(32).toString('base64url');
+}
+
+async function generateCodeChallenge(verifier: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(verifier);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return Buffer.from(digest).toString('base64url');
+}
+
+function generateState(): string {
+  return randomBytes(16).toString('hex');
+}
+
+async function fetchOAuthMetadata(mcpBaseUrl: string): Promise<OAuthMetadata> {
+  const metadataUrl = `${mcpBaseUrl}/.well-known/oauth-authorization-server`;
+  const response = await fetch(metadataUrl);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch OAuth metadata: ${response.status}`);
+  }
+
+  return response.json() as Promise<OAuthMetadata>;
+}
+
+async function registerClient(
+  registrationEndpoint: string,
+  redirectUri: string
+): Promise<OAuthClientRegistration> {
+  const response = await fetch(registrationEndpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_name: 'Airlock Benchmark CLI',
+      redirect_uris: [redirectUri],
+      grant_types: ['authorization_code'],
+      response_types: ['code'],
+      token_endpoint_auth_method: 'none', // Public client
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Failed to register OAuth client: ${response.status} ${text}`);
+  }
+
+  return response.json() as Promise<OAuthClientRegistration>;
+}
+
+async function exchangeCodeForToken(
+  tokenEndpoint: string,
+  code: string,
+  clientId: string,
+  redirectUri: string,
+  codeVerifier: string
+): Promise<OAuthTokenResponse> {
+  const response = await fetch(tokenEndpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'authorization_code',
+      code,
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      code_verifier: codeVerifier,
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Failed to exchange code for token: ${response.status} ${text}`);
+  }
+
+  return response.json() as Promise<OAuthTokenResponse>;
+}
+
+function startCallbackServer(port: number): Promise<{ code: string; state: string }> {
+  return new Promise((resolve, reject) => {
+    const server = createServer((req: IncomingMessage, res: ServerResponse) => {
+      const url = new URL(req.url || '/', `http://localhost:${port}`);
+
+      if (url.pathname === '/callback') {
+        const code = url.searchParams.get('code');
+        const state = url.searchParams.get('state');
+        const error = url.searchParams.get('error');
+
+        if (error) {
+          res.writeHead(400, { 'Content-Type': 'text/html' });
+          res.end(`
+            <html>
+              <body style="font-family: sans-serif; text-align: center; padding: 50px;">
+                <h1>❌ Authentication Failed</h1>
+                <p>Error: ${error}</p>
+                <p>You can close this window.</p>
+              </body>
+            </html>
+          `);
+          server.close();
+          reject(new Error(`OAuth error: ${error}`));
+          return;
+        }
+
+        if (code && state) {
+          res.writeHead(200, { 'Content-Type': 'text/html' });
+          res.end(`
+            <html>
+              <body style="font-family: sans-serif; text-align: center; padding: 50px;">
+                <h1>✅ Authentication Successful</h1>
+                <p>You can close this window and return to the terminal.</p>
+                <script>window.close();</script>
+              </body>
+            </html>
+          `);
+          server.close();
+          resolve({ code, state });
+        } else {
+          res.writeHead(400, { 'Content-Type': 'text/plain' });
+          res.end('Missing code or state parameter');
+        }
+      } else {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Not found');
+      }
+    });
+
+    server.listen(port, '127.0.0.1', () => {
+      // Server started
+    });
+
+    server.on('error', (err) => {
+      reject(err);
+    });
+
+    // Timeout after 5 minutes
+    setTimeout(() => {
+      server.close();
+      reject(new Error('Authentication timed out'));
+    }, 5 * 60 * 1000);
+  });
+}
+
+async function oauthAuthenticate(mcpBaseUrl: string): Promise<string> {
+  console.log('\n🔐 OAuth Authentication\n');
+
+  // Find an available port
+  const port = 9876 + Math.floor(Math.random() * 100);
+  const redirectUri = `http://127.0.0.1:${port}/callback`;
+
+  // Fetch OAuth metadata
+  console.log('   📡 Fetching OAuth configuration...');
+  const metadata = await fetchOAuthMetadata(mcpBaseUrl);
+  console.log('   ✓ OAuth server found\n');
+
+  // Register client dynamically
+  if (!metadata.registration_endpoint) {
+    throw new Error('OAuth server does not support dynamic client registration');
+  }
+
+  console.log('   📝 Registering CLI client...');
+  const client = await registerClient(metadata.registration_endpoint, redirectUri);
+  console.log('   ✓ Client registered\n');
+
+  // Generate PKCE challenge
+  const codeVerifier = generateCodeVerifier();
+  const codeChallenge = await generateCodeChallenge(codeVerifier);
+  const state = generateState();
+
+  // Build authorization URL
+  const authUrl = new URL(metadata.authorization_endpoint);
+  authUrl.searchParams.set('response_type', 'code');
+  authUrl.searchParams.set('client_id', client.client_id);
+  authUrl.searchParams.set('redirect_uri', redirectUri);
+  authUrl.searchParams.set('state', state);
+  authUrl.searchParams.set('code_challenge', codeChallenge);
+  authUrl.searchParams.set('code_challenge_method', 'S256');
+
+  // Start callback server
+  const callbackPromise = startCallbackServer(port);
+
+  // Open browser
+  console.log('   🌐 Opening browser for authentication...');
+  console.log(`   (If browser doesn't open, visit: ${authUrl.toString()})\n`);
+  openBrowser(authUrl.toString());
+
+  console.log('   ⏳ Waiting for authentication...');
+
+  // Wait for callback
+  const { code, state: returnedState } = await callbackPromise;
+
+  // Verify state
+  if (returnedState !== state) {
+    throw new Error('OAuth state mismatch - possible CSRF attack');
+  }
+
+  console.log('   ✓ Authorization code received\n');
+
+  // Exchange code for token
+  console.log('   🔑 Exchanging code for access token...');
+  const tokenResponse = await exchangeCodeForToken(
+    metadata.token_endpoint,
+    code,
+    client.client_id,
+    redirectUri,
+    codeVerifier
+  );
+
+  console.log('   ✓ Access token obtained\n');
+
+  return tokenResponse.access_token;
+}
+
+// Fallback to manual token entry
 function prompt(question: string, hidden = false): Promise<string> {
   const rl = createInterface({
     input: process.stdin,
@@ -144,7 +381,6 @@ function prompt(question: string, hidden = false): Promise<string> {
 
   return new Promise((resolve) => {
     if (hidden && process.stdin.isTTY) {
-      // For hidden input (like tokens), we'll still show it but mention it's sensitive
       process.stdout.write(question);
       let input = '';
 
@@ -156,7 +392,7 @@ function prompt(question: string, hidden = false): Promise<string> {
         switch (char) {
           case '\n':
           case '\r':
-          case '\u0004': // Ctrl+D
+          case '\u0004':
             process.stdin.setRawMode(false);
             process.stdin.pause();
             process.stdin.removeListener('data', onData);
@@ -164,10 +400,10 @@ function prompt(question: string, hidden = false): Promise<string> {
             rl.close();
             resolve(input);
             break;
-          case '\u0003': // Ctrl+C
+          case '\u0003':
             process.exit(1);
             break;
-          case '\u007F': // Backspace
+          case '\u007F':
             if (input.length > 0) {
               input = input.slice(0, -1);
               process.stdout.clearLine(0);
@@ -191,40 +427,30 @@ function prompt(question: string, hidden = false): Promise<string> {
   });
 }
 
-async function interactiveAuth(orgSlug: string, env: string): Promise<string> {
-  console.log('\n🔐 Interactive Authentication\n');
-  console.log('   To run the benchmark, you need an MCP access token from Airlock.');
-  console.log('   Opening your browser to the Airlock dashboard...\n');
+async function interactiveAuth(mcpBaseUrl: string): Promise<string> {
+  try {
+    // Try OAuth first
+    return await oauthAuthenticate(mcpBaseUrl);
+  } catch (error) {
+    // Fall back to manual token entry
+    console.log(`\n   ⚠️  OAuth authentication failed: ${error instanceof Error ? error.message : error}`);
+    console.log('   Falling back to manual token entry...\n');
 
-  // Determine the dashboard URL based on environment
-  let dashboardUrl: string;
-  switch (env) {
-    case 'production':
-      dashboardUrl = 'https://www.air-lock.ai/servers';
-      break;
-    case 'staging':
-      dashboardUrl = 'https://control-room.staging.air-lock.ai/servers';
-      break;
-    default:
-      dashboardUrl = `https://${env}.dev.air-lock.ai/servers`;
+    console.log('   📋 Instructions:');
+    console.log('   1. Go to your Airlock dashboard');
+    console.log('   2. Select any project in your organization');
+    console.log('   3. Go to the "Connection" tab');
+    console.log('   4. Copy the "MCP Access Token"\n');
+
+    const token = await prompt('   Paste your MCP token here: ', true);
+
+    if (!token || token.trim().length === 0) {
+      throw new Error('No token provided');
+    }
+
+    console.log('\n   ✓ Token received\n');
+    return token.trim();
   }
-
-  openBrowser(dashboardUrl);
-
-  console.log('   📋 Instructions:');
-  console.log('   1. Sign in to Airlock (if not already signed in)');
-  console.log('   2. Select any project in your organization');
-  console.log('   3. Go to the "Connection" tab');
-  console.log('   4. Copy the "MCP Access Token"\n');
-
-  const token = await prompt('   Paste your MCP token here: ', true);
-
-  if (!token || token.trim().length === 0) {
-    throw new Error('No token provided');
-  }
-
-  console.log('\n   ✓ Token received\n');
-  return token.trim();
 }
 
 // ============================================================================
@@ -537,12 +763,15 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  // Get token - either from args or interactively
+  // Get token - either from args or via OAuth
   let token = values.token;
 
   if (!token) {
+    // Get MCP base URL (without the /org/slug part) for OAuth
+    const mcpBaseUrl = url.replace(/\/org\/[^/]+$/, '');
+
     try {
-      token = await interactiveAuth(orgSlug, env);
+      token = await interactiveAuth(mcpBaseUrl);
     } catch (error) {
       console.error('\n❌ Authentication failed:', error instanceof Error ? error.message : error);
       process.exit(1);

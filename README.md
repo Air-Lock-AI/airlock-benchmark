@@ -88,13 +88,16 @@ npm run benchmark:live -- --org-slug my-org --format json
 
 ### Authentication
 
-When you run the benchmark without a `--token`, it will:
+When you run the benchmark without a `--token`, it uses **OAuth 2.0** with PKCE:
 
-1. Open your browser to the Airlock dashboard
-2. Show instructions to copy your MCP token
-3. Prompt you to paste the token (input is hidden)
+1. Registers a temporary CLI client with Airlock
+2. Opens your browser to sign in
+3. Receives the authorization code via local callback
+4. Exchanges for an access token automatically
 
-Alternatively, pass `--token` directly if you already have it.
+No manual token copying required! Just sign in and you're done.
+
+If OAuth fails (e.g., firewall blocking localhost), it falls back to manual token entry.
 
 ### Live Benchmark Output
 
