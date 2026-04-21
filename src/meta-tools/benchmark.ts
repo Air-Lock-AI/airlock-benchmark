@@ -13,7 +13,7 @@
 import { readFileSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { countTokens, countToolTokens, freeEncoder } from './token-counter.js';
+import { countTokens, countToolTokens, freeEncoder } from '../shared/token-counter.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
