@@ -24,3 +24,7 @@ coverage/
 # Environment
 .env
 .env.local
+
+# Airlock Code benchmark caches + reports
+.cache/
+evaluate/reports/

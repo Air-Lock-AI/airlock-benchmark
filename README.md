@@ -1,210 +1,206 @@
-# Airlock Meta-Tools Benchmark
+# Airlock Benchmarks
 
-Benchmark token savings of [Airlock's](https://www.air-lock.ai) **meta-tools approach** vs traditional **full tool expansion** for MCP (Model Context Protocol) servers.
+Reproducible token-savings benchmarks for [Airlock](https://www.air-lock.ai). Two scopes, one repo:
 
-## Background
+| Benchmark | What it measures |
+|-----------|------------------|
+| **Meta-tools** (`npm run benchmark:meta`) | Savings from exposing **4 meta-tools** (`list_services`, `search_tools`, `describe_tools`, `execute_tool`) instead of full OpenAPI expansion (N tool definitions per connected API). |
+| **Airlock Code** (`npm run benchmark:code`) | Savings from calling Airlock Code's `code_review_context` instead of reading changed files directly. Mirrors the methodology of [code-review-graph](https://github.com/tirth8205/code-review-graph) so the numbers compare row-for-row. |
 
-When exposing APIs to AI agents via MCP, there are two approaches:
-
-### Full Expansion (Traditional)
-Every API endpoint becomes an individual MCP tool. For an organization with 10 connected APIs averaging 30 endpoints each, the AI receives **300 tool definitions** in every message.
-
-### Meta-Tools (Airlock's Approach)
-Only **4 tools** are exposed regardless of how many APIs are connected:
-
-| Tool | Purpose |
-|------|---------|
-| `list_services` | List connected services with tool counts |
-| `search_tools` | Find tools by keyword |
-| `describe_tools` | Get full schema for specific tools |
-| `execute_tool` | Run any tool via `service-slug/tool-name` |
+Both benchmarks have a deterministic simulated mode that runs offline, and a `--live` variant that measures against your real Airlock instance.
 
 ## Quick Start
 
 ```bash
-# Clone the repository
 git clone https://github.com/Air-Lock-AI/airlock-benchmark.git
 cd airlock-benchmark
-
-# Install dependencies
 npm install
 
-# Run the benchmark
+# Run both benchmarks (simulated — no Airlock instance required)
 npm run benchmark
+
+# Just one of them
+npm run benchmark:meta
+npm run benchmark:code
 ```
 
-## Sample Output
+---
 
-```
+## Meta-tools Benchmark
+
+When exposing APIs to AI agents via MCP there are two approaches:
+
+- **Full expansion** — every endpoint becomes its own MCP tool. 10 APIs × 30 endpoints = **300 tool definitions** sent on every message.
+- **Meta-tools** — Airlock exposes **4 tools** regardless of how many APIs are connected. The agent discovers specific tools via `search_tools` / `describe_tools` and invokes them through `execute_tool`.
+
+### Sample output
+
+```text
 📦 Meta-Tools (4 tools):
---------------------------------------------------
   list_services       :     63 tokens
   search_tools        :    130 tokens
   describe_tools      :    120 tokens
   execute_tool        :    144 tokens
---------------------------------------------------
   TOTAL               :    457 tokens
 
 📊 Benchmark Results:
-------------------------------------------------------------------------------------------------------------------------------
-| Scenario                              | APIs | Tools | Meta    | Full      | Saved     | %     | $/req   | $/user/mo |
-|---------------------------------------|------|-------|---------|-----------|-----------|-------|---------|-----------|
-| Single API (Linear)                   | 1    | 9     | 457     | 1,091     | 634       | 58.1% | $0.0019 | $1.90     |
-| Single API (GitHub)                   | 1    | 18    | 457     | 2,928     | 2,471     | 84.4% | $0.0074 | $7.41     |
-| Three APIs (typical org)              | 3    | 32    | 457     | 4,878     | 4,421     | 90.6% | $0.013  | $13.26    |
-| Large org (10 APIs)                   | 10   | 277   | 457     | 31,485    | 31,028    | 98.5% | $0.093  | $93.08    |
-
-*Based on ~1,000 requests/user/month and Claude Sonnet 4.5 pricing ($3/1M input tokens)*
+| Scenario                 | APIs | Tools | Meta | Full   | Saved  | %     | $/req   | $/user/mo |
+|--------------------------|------|-------|------|--------|--------|-------|---------|-----------|
+| Single API (Linear)      | 1    | 9     | 457  | 1,091  | 634    | 58.1% | $0.0019 | $1.90     |
+| Three APIs (typical org) | 3    | 32    | 457  | 4,878  | 4,421  | 90.6% | $0.013  | $13.26    |
+| Large org (10 APIs)      | 10   | 277   | 457  | 31,485 | 31,028 | 98.5% | $0.093  | $93.08    |
 ```
 
-## Output Formats
+*Based on ~1,000 requests/user/month at Claude Sonnet 4.5 pricing ($3/1M input tokens).*
+
+### Output formats
 
 ```bash
-# Terminal output (default)
-npm run benchmark
-
-# JSON (for programmatic use)
-npm run benchmark:json
-
-# Markdown (for documentation)
-npm run benchmark:markdown
+npm run benchmark:meta                 # terminal
+npm run benchmark:meta:json            # JSON
+npm run benchmark:meta:markdown        # markdown table
 ```
 
-## Live Benchmark (Against Your Airlock Instance)
-
-Measure actual token usage against your real Airlock organization:
+### Live meta-tools benchmark (against your Airlock instance)
 
 ```bash
-# Interactive authentication (opens browser for OAuth sign-in)
-npm run benchmark:live -- --org my-org
-
-# With token provided directly
-npm run benchmark:live -- --org my-org --token $MCP_TOKEN
-
-# Using staging environment
-npm run benchmark:live -- --org my-org --env staging
-
-# Output as JSON
-npm run benchmark:live -- --org my-org --format json
+npm run benchmark:meta:live -- --org my-org
+npm run benchmark:meta:live -- --org my-org --token $MCP_TOKEN
+npm run benchmark:meta:live -- --org my-org --env staging
 ```
 
-### Authentication
+Without `--token`, OAuth 2.0 + PKCE opens your browser, completes sign-in, and retrieves a token automatically. If OAuth fails it falls back to manual token paste.
 
-When you run the benchmark without a `--token`, it uses **OAuth 2.0** with PKCE:
-
-1. Registers a temporary CLI client with Airlock
-2. Opens your browser to sign in
-3. Receives the authorization code via local callback
-4. Exchanges for an access token automatically
-
-No manual token copying required! Just sign in and you're done.
-
-If OAuth fails (e.g., firewall blocking localhost), it falls back to manual token entry.
-
-### Live Benchmark Output
-
-```
-📊 Organization: my-org
-   Timestamp: 2024-01-15T10:30:00.000Z
-
-📦 Services (3):
-   • Linear: 9 tools
-   • GitHub: 18 tools
-   • Google Calendar: 5 tools
-   Total: 32 tools
-
-📏 Token Measurements:
-   Meta-tool definitions:    457 tokens (constant)
-   list_services response:   180 tokens
-   search_tools response:    250 tokens
-   describe_tools response:  320 tokens
-   Full expansion estimate:  4,480 tokens
-
-⚖️  Fair Comparison:
-   Meta-tools workflow:  2,028 tokens
-   Full expansion:       4,480 tokens
-   Savings:              2,452 tokens (54.7%)
-
-💡 🟢 Meta-tools recommended - good savings
-```
-
-## Using Your Own OpenAPI Specs
-
-Add your OpenAPI specs (JSON format) to `src/sample-specs/`:
+### Using your own OpenAPI specs
 
 ```bash
-cp your-api-spec.json src/sample-specs/
-npm run benchmark
+cp your-api-spec.json src/meta-tools/sample-specs/
+npm run benchmark:meta
 ```
 
-The benchmark automatically loads all `.json` files from the `sample-specs` directory.
+All `.json` files in `src/meta-tools/sample-specs/` are loaded as scenarios.
 
-## Fair Comparison
+---
 
-This benchmark accounts for the **full workflow overhead** of the meta-tools approach:
+## Airlock Code Benchmark
 
-**Meta-tools workflow** (3 API calls):
-1. `search_tools("create issue")` → returns matching tools (~150 tokens)
-2. `describe_tools(["linear/create_issue"])` → returns full schema (~100 tokens)
-3. `execute_tool("linear/create_issue", {...})` → executes
+Airlock Code ships 16 MCP tools that query a structural graph of your indexed repositories (symbols, calls, imports, tests, flows). Instead of asking the agent to read every changed file to answer "what breaks if this PR lands?", it returns a compact graph response scoped to the blast radius.
 
-**Full expansion workflow** (1 API call):
-1. Direct tool call → executes
+This benchmark replicates the methodology used by [code-review-graph](https://github.com/tirth8205/code-review-graph) — same six repos, same thirteen commits, same three token metrics — so Airlock Code's ratios compare directly to theirs.
 
-### Overhead Calculation
+### Methodology
 
-Meta-tools workflow total: `(457 × 3) + 250 response tokens ≈ 1,621 tokens`
+For each commit in the fixture set, we compute:
 
-| Scenario | Full Expansion | Meta-tools (fair) | Difference | $/req | $/user/mo |
-|----------|----------------|-------------------|------------|-------|-----------|
-| Single API (5 tools) | 859 | 1,621 | ❌ +762 (meta costs more) | -$0.002 | -$2.29 |
-| Single API (9 tools) | 1,091 | 1,621 | ❌ +530 (meta costs more) | -$0.002 | -$1.59 |
-| Single API (18 tools) | 2,928 | 1,621 | ✅ -1,307 (45% savings) | $0.004 | $3.92 |
-| Three APIs (32 tools) | 4,878 | 1,621 | ✅ -3,257 (67% savings) | $0.010 | $9.77 |
-| Medium org (122 tools) | 14,652 | 1,621 | ✅ -13,031 (89% savings) | $0.039 | $39.09 |
-| Large org (277 tools) | 31,485 | 1,621 | ✅ -29,864 (95% savings) | $0.090 | $89.59 |
-| Enterprise (865 tools) | 95,360 | 1,621 | ✅ -93,739 (98% savings) | $0.281 | $281.22 |
+| Metric | How it's computed |
+|--------|-------------------|
+| `naive_tokens` | `sum(tiktoken(file_content))` over every changed file — what an agent would burn reading each changed file end-to-end. |
+| `standard_tokens` | `tiktoken(git diff -U3 <sha>~1 <sha>)` — the unified diff itself. |
+| `graph_tokens` | `tiktoken(JSON.stringify(code_review_context response))` — what Airlock Code would return for the same PR review. |
 
-*Based on ~1,000 requests/user/month and Claude Sonnet 4.5 pricing ($3/1M input tokens)*
+Ratios are reported as `naive / graph` and `standard / graph`. All three counts use tiktoken's `cl100k_base` encoding.
 
-**Break-even point**: ~12-15 total tools (typically 2 APIs)
+The fixture set (locked to specific SHAs for reproducibility):
 
-## When to Use Each Approach
+| Repo | Commits | Language | Size |
+|------|--------:|----------|------|
+| [express](https://github.com/expressjs/express) | 2 | JavaScript | small |
+| [fastapi](https://github.com/tiangolo/fastapi) | 2 | Python | medium |
+| [flask](https://github.com/pallets/flask) | 2 | Python | small |
+| [gin](https://github.com/gin-gonic/gin) | 3 | Go | small |
+| [httpx](https://github.com/encode/httpx) | 2 | Python | small |
+| nextjs (label) | 2 | Python | medium |
 
-| Scenario | Tools | Recommendation | Fair Comparison |
-|----------|-------|----------------|-----------------|
-| Single small API | <10 | Full expansion | Meta costs ~600 more tokens |
-| Single medium API | 10-20 | Either works | Roughly break-even |
-| 2-3 APIs | 20-40 | Meta-tools | Saves 50-70% |
-| 5+ APIs | 50-150 | Meta-tools | Saves 80-90% |
-| Enterprise (10+ APIs) | 200+ | Meta-tools essential | Saves 95%+ |
+### Simulated mode (default)
 
-## How It Works
+```bash
+npm run benchmark:code                            # terminal
+npm run benchmark:code:json                       # JSON
+npm run benchmark:code:markdown                   # markdown
+npm run benchmark:code -- --only httpx            # single repo
+npm run benchmark:code -- --report                # also writes evaluate/reports/summary.md
+```
 
-### Token Counting
+The first run clones the fixture repos into `.cache/airlock-code-repos/` (git-ignored). Subsequent runs only fetch missing commits, so they take a few seconds.
 
-The benchmark uses [tiktoken](https://github.com/openai/tiktoken) with the `cl100k_base` encoding for accurate token counts. This is the same tokenizer used by GPT-4 and similar models.
+The `graph_tokens` column is simulated — we generate a response matching the exact shape Airlock's `code_review_context` SQL returns (`{rows, count, truncated}` with `{category, name, entity_type, confidence}` rows), sized from the actual symbol counts in the changed files. Use `--live` below to replace the simulation with real measurements.
 
-### Tool Schema Generation
+### Your-own-PRs mode
 
-OpenAPI specs are converted to MCP tool schemas:
-- `operationId` → tool name
-- `description` or `summary` → tool description
-- Parameters + requestBody → `inputSchema`
+The fixture set is for reproducibility; for "how much would we save on our own PRs?", point at any GitHub repo and a list of PR numbers (or the last N merged PRs). Works with private repos via `gh auth`.
 
-## Contributing
+```bash
+# Last 20 merged PRs from your repo
+npm run benchmark:code -- --repo Air-Lock-AI/airlock --last 20
 
-Contributions welcome! Ideas:
+# Specific PRs
+npm run benchmark:code -- --repo Air-Lock-AI/airlock --pr 1105,1104,1103
 
-- Add more sample API specs
-- Visualization/charts
-- Performance benchmarks (latency comparison)
+# Use an existing local clone (no re-clone, no working-tree mutation)
+npm run benchmark:code -- --repo Air-Lock-AI/airlock --last 20 \
+    --local-repo ~/projects/airlock
+
+# Raw commit SHAs
+npm run benchmark:code -- --repo Air-Lock-AI/airlock --sha abc123,def456
+```
+
+All file reads go through `git show <sha>:<path>`, so `--local-repo` never touches the working tree — safe to run against a checkout with in-flight work. The live variant accepts the same flags and calls `code_review_context` against your Airlock org:
+
+```bash
+npm run benchmark:code:live -- --org my-org --repo Air-Lock-AI/airlock --last 20 \
+    --local-repo ~/projects/airlock --report
+```
+
+The repo must be connected to your Airlock Code org (the benchmark passes `repository=github:<owner>/<name>` to scope the query). Commits whose repo isn't indexed are skipped with a warning.
+
+### Live mode (against your Airlock Code instance)
+
+```bash
+npm run benchmark:code:live -- --org my-org
+npm run benchmark:code:live -- --org my-org --only httpx
+npm run benchmark:code:live -- --url https://mcp.air-lock.ai/org/my-org --token $MCP_TOKEN
+```
+
+Each fixture repo must be connected to your Airlock org — the benchmark passes `repository=github:<owner>/<repo>` so the graph query scopes to the commit's repo. If a repo isn't indexed, that commit is skipped with a warning.
+
+Pass `--report` to drop a timestamped `summary-live-<org>.md` into `evaluate/reports/`.
+
+### Directory layout
+
+```text
+src/
+  shared/
+    token-counter.ts        # tiktoken cl100k_base
+    oauth.ts                # OAuth + PKCE + manual-token fallback
+    mcp-client.ts           # JSON-RPC 2.0 MCP client
+  meta-tools/
+    benchmark.ts            # simulated meta-tools comparison
+    benchmark-live.ts       # live against a real Airlock org
+    sample-specs/           # OpenAPI specs driving the scenarios
+  airlock-code/
+    benchmark.ts            # simulated token-efficiency run
+    benchmark-live.ts       # live — calls real code_review_context
+    fixtures.ts             # 6 repos × 13 commits (mirrors code-review-graph)
+    token-efficiency.ts     # naive / standard / graph token calculations
+    simulate-response.ts    # simulated code_review_context response shape
+```
+
+---
+
+## Why two benchmarks?
+
+They answer different questions:
+
+- **Meta-tools** is a per-request overhead question: "how many tool-definition tokens does the agent pay on every message?" The win scales with how many APIs are connected — negligible at 1 API, ~98% savings at 10+.
+- **Airlock Code** is a per-task overhead question: "how many tokens does the agent burn answering one structural question about the codebase?" The win scales with repo size — small single-file PRs can be cheaper to read directly; medium and large PRs save 5–20×.
+
+A production Airlock deployment typically benefits from both, and they compose: the meta-tools layer keeps the tool list small, and Airlock Code keeps the responses inside those tools small.
 
 ## Related
 
-- [Airlock](https://www.air-lock.ai) - MCP server generator from OpenAPI specs
-- [Model Context Protocol](https://modelcontextprotocol.io) - Open protocol for AI tool use
-- [Anthropic Claude](https://claude.ai) - AI assistant that uses MCP
+- [Airlock](https://www.air-lock.ai) — MCP server generator with meta-tools + Airlock Code
+- [code-review-graph](https://github.com/tirth8205/code-review-graph) — the benchmark whose token_efficiency methodology we mirror
+- [Model Context Protocol](https://modelcontextprotocol.io) — open protocol for AI tool use
 
 ## License
 
