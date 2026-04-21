@@ -228,11 +228,24 @@ export function buildSimulatedReviewContext(
  * Airlock's MCP layer does — compact JSON, no pretty-printing — so the
  * token count reflects what an agent would actually receive.
  */
+/**
+ * Derive a `github:owner/repo` slug from a fixture URL. Tolerates trailing
+ * `.git` and query/fragment suffixes, and accepts dotted repo names.
+ */
+function slugFromFixtureUrl(url: string): string {
+  const match = url.match(
+    /github\.com\/([A-Za-z0-9][A-Za-z0-9._-]*)\/([A-Za-z0-9][A-Za-z0-9._-]*?)(?:\.git)?(?:[/?#].*)?$/,
+  );
+  return match ? `github:${match[1]}/${match[2]}` : 'benchmark/repo';
+}
+
 export const simulatedGraphTokenProvider: GraphTokenProvider = async (
   changedFiles,
   repoPath,
   sha,
+  fixture,
 ) => {
-  const response = buildSimulatedReviewContext(changedFiles, repoPath, sha);
+  const slug = slugFromFixtureUrl(fixture.url);
+  const response = buildSimulatedReviewContext(changedFiles, repoPath, sha, slug);
   return JSON.stringify(response);
 };

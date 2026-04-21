@@ -98,12 +98,21 @@ export class MCPClient {
     });
   }
 
-  /** Returns the raw response text that would be seen by an agent. */
+  /**
+   * Returns the raw response text that would be seen by an agent.
+   *
+   * Concatenates all `text`-typed content blocks, not just the first —
+   * Airlock Code tools can return multiple blocks (e.g. summary + rows)
+   * and dropping blocks would undercount tokens and silently hide results.
+   */
   async callToolText(
     name: string,
     args: Record<string, unknown>,
   ): Promise<string> {
     const result = await this.callTool(name, args);
-    return result.content?.[0]?.text ?? '';
+    return (result.content ?? [])
+      .filter((c) => c.type === 'text' && typeof c.text === 'string')
+      .map((c) => c.text)
+      .join('');
   }
 }

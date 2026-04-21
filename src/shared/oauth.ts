@@ -157,6 +157,25 @@ async function exchangeCodeForToken(
   return response.json() as Promise<OAuthTokenResponse>;
 }
 
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => {
+    switch (c) {
+      case '&':
+        return '&amp;';
+      case '<':
+        return '&lt;';
+      case '>':
+        return '&gt;';
+      case '"':
+        return '&quot;';
+      case "'":
+        return '&#39;';
+      default:
+        return c;
+    }
+  });
+}
+
 function startCallbackServer(port: number): Promise<{ code: string; state: string }> {
   return new Promise((resolve, reject) => {
     const server = createServer((req: IncomingMessage, res: ServerResponse) => {
@@ -167,12 +186,17 @@ function startCallbackServer(port: number): Promise<{ code: string; state: strin
         const error = url.searchParams.get('error');
         if (error) {
           res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' });
+          // Escape `error`: the value is attacker-controllable (comes from
+          // the IdP redirect's query string) and was previously interpolated
+          // raw into the response body, which CodeQL correctly flagged as
+          // reflected XSS.
           res.end(
             `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Authentication Failed</title></head>` +
               `<body style="font-family: sans-serif; text-align: center; padding: 50px;">` +
               `<h1 style="color: #dc3545;">Authentication Failed</h1>` +
-              `<p>Error: ${error}</p><p>You can close this window.</p></body></html>`,
+              `<p>Error: ${escapeHtml(error)}</p><p>You can close this window.</p></body></html>`,
           );
+          cleanup();
           server.close();
           reject(new Error(`OAuth error: ${error}`));
           return;
@@ -186,6 +210,7 @@ function startCallbackServer(port: number): Promise<{ code: string; state: strin
               `<p>You can close this window and return to the terminal.</p>` +
               `<script>window.close();</script></body></html>`,
           );
+          cleanup();
           server.close();
           resolve({ code, state });
         } else {
@@ -199,10 +224,14 @@ function startCallbackServer(port: number): Promise<{ code: string; state: strin
     });
     server.listen(port, '127.0.0.1');
     server.on('error', (err) => reject(err));
-    setTimeout(() => {
+    // Keep the timer handle so a successful / failed auth can cancel it —
+    // otherwise the node event loop stays alive for 5 minutes after the
+    // CLI is otherwise done.
+    const timeout = setTimeout(() => {
       server.close();
       reject(new Error('Authentication timed out'));
     }, 5 * 60 * 1000);
+    const cleanup = () => clearTimeout(timeout);
   });
 }
 

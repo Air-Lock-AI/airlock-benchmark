@@ -33,7 +33,12 @@ export interface CommitTokenResult {
 
 export interface GraphTokenProvider {
   /** Returns the JSON-serialised response an agent would receive. */
-  (changedFiles: string[], repoPath: string, sha: string): Promise<string>;
+  (
+    changedFiles: string[],
+    repoPath: string,
+    sha: string,
+    fixture: RepoFixture,
+  ): Promise<string>;
 }
 
 /** Where we clone benchmark repos. Kept outside src/ so tsc leaves it alone. */
@@ -68,7 +73,11 @@ export function ensureRepo(repo: RepoFixture, localRepoPath?: string): string {
   const path = join(CACHE_DIR, repo.name);
 
   if (!existsSync(join(path, '.git'))) {
-    run(`git clone --filter=blob:none ${repo.url} ${path}`);
+    // `git clone` via `execSync` goes through /bin/sh, so quote both the
+    // URL and path defensively (CACHE_DIR is derived from process.cwd(),
+    // which can contain spaces or other shell-metachars on a user
+    // workstation).
+    run(`git clone --filter=blob:none ${shellQuote(repo.url)} ${shellQuote(path)}`);
   }
 
   for (const commit of repo.commits) {
@@ -122,7 +131,13 @@ export function getChangedFiles(repoPath: string, sha: string): string[] {
  * the commit via `git show <sha>:<path>` so we never touch the working
  * tree. Files that were deleted in the commit produce zero tokens (git
  * show errors, we swallow it).
+ *
+ * Caps individual files at 5 MB — the same guard code-review-graph uses
+ * via `errors="replace"` + implicit memory limits. Without it, a single
+ * lockfile or checked-in CSV can dominate the naive side of a PR.
  */
+const MAX_NAIVE_FILE_BYTES = 5 * 1024 * 1024;
+
 export function countNaiveTokens(
   repoPath: string,
   files: string[],
@@ -131,6 +146,17 @@ export function countNaiveTokens(
   let total = 0;
   for (const f of files) {
     try {
+      // `git cat-file -s` is the cheap pre-check: it returns the blob size
+      // without materializing the content, so we bail early on large files
+      // before paying the tiktoken cost.
+      const sizeRaw = execSync(`git cat-file -s ${sha}:${shellQuote(f)}`, {
+        cwd: repoPath,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim();
+      const size = Number.parseInt(sizeRaw, 10);
+      if (Number.isNaN(size) || size > MAX_NAIVE_FILE_BYTES) continue;
+
       const content = execSync(`git show ${sha}:${shellQuote(f)}`, {
         cwd: repoPath,
         encoding: 'utf8',
@@ -184,7 +210,12 @@ export async function measureCommit(
 
   const naiveTokens = countNaiveTokens(repoPath, changed, commit.sha);
   const standardTokens = countStandardTokens(repoPath, commit.sha);
-  const responseJson = await graphTokenProvider(changed, repoPath, commit.sha);
+  const responseJson = await graphTokenProvider(
+    changed,
+    repoPath,
+    commit.sha,
+    repo,
+  );
   const graphTokens = countTokens(responseJson);
 
   return {

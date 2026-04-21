@@ -44,9 +44,14 @@ import {
 /**
  * Derive the `github:owner/repo` slug used as the Airlock Code `repository`
  * filter. Driven off the fixture URL so it stays in sync with what we clone.
+ *
+ * Accepts dotted repo names (`owner/service.api`) — the previous version's
+ * `[^/.]+` rejected any `.` and silently truncated the slug.
  */
 function repoFilterFor(fixture: RepoFixture): string {
-  const match = fixture.url.match(/github\.com\/([^/]+)\/([^/.]+)/);
+  const match = fixture.url.match(
+    /github\.com\/([A-Za-z0-9][A-Za-z0-9._-]*)\/([A-Za-z0-9][A-Za-z0-9._-]*?)(?:\.git)?(?:[/?#].*)?$/,
+  );
   if (!match) {
     throw new Error(`Could not parse owner/repo from ${fixture.url}`);
   }
@@ -475,7 +480,7 @@ async function main(): Promise<void> {
 
   let token = values.token;
   if (!token) {
-    const mcpBaseUrl = url.replace(/\/org\/[^/]+$/, '');
+    const mcpBaseUrl = url.replace(/\/+$/, '').replace(/\/org\/[^/]+$/, '');
     try {
       token = await interactiveAuth(mcpBaseUrl);
     } catch (err) {
@@ -506,6 +511,13 @@ async function main(): Promise<void> {
       only: values.only as string | undefined,
       dynamicFixture,
     });
+    if (results.length === 0) {
+      console.error(
+        '\n❌ No commits were measured. Check that the repo is connected to the ' +
+          "org and indexed, and that gh can see the PRs you're targeting.",
+      );
+      process.exit(1);
+    }
     const aggregates = aggregateByRepo(results);
 
     if (values.format === 'json') {

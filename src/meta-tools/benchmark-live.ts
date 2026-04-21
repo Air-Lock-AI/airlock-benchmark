@@ -285,7 +285,10 @@ async function main(): Promise<void> {
 
   let token = values.token;
   if (!token) {
-    const mcpBaseUrl = url.replace(/\/org\/[^/]+$/, '');
+    // Strip trailing slashes before stripping the /org/<slug> suffix so we
+    // handle both `…/org/foo` and `…/org/foo/` forms without mangling the
+    // OAuth metadata URL.
+    const mcpBaseUrl = url.replace(/\/+$/, '').replace(/\/org\/[^/]+$/, '');
     try {
       token = await interactiveAuth(mcpBaseUrl);
     } catch (error) {

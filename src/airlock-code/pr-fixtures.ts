@@ -147,7 +147,10 @@ function validateSha(sha: string): void {
 
 export function buildDynamicFixture(opts: BuildFixtureOptions): RepoFixture {
   validateRepo(opts.repo);
-  const [, name] = opts.repo.split('/');
+  // Keep owner in the fixture name so the cache path is
+  // `.cache/airlock-code-repos/<owner>__<name>` — otherwise two orgs'
+  // repos with the same name (`acme/foo` and `beta/foo`) collide.
+  const [owner, name] = opts.repo.split('/');
 
   const commits: CommitFixture[] = [];
   if (opts.prs && opts.prs.length > 0) {
@@ -180,7 +183,7 @@ export function buildDynamicFixture(opts: BuildFixtureOptions): RepoFixture {
   }
 
   return {
-    name: name.toLowerCase(),
+    name: `${owner}__${name}`.toLowerCase(),
     url: cloneUrlFor(opts.repo),
     language: inferLanguage(opts.repo),
     sizeCategory: 'small',

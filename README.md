@@ -35,7 +35,7 @@ When exposing APIs to AI agents via MCP there are two approaches:
 
 ### Sample output
 
-```
+```text
 📦 Meta-Tools (4 tools):
   list_services       :     63 tokens
   search_tools        :    130 tokens
@@ -44,11 +44,11 @@ When exposing APIs to AI agents via MCP there are two approaches:
   TOTAL               :    457 tokens
 
 📊 Benchmark Results:
-| Scenario                 | APIs | Tools | Meta | Full    | Saved   | %     | $/user/mo |
-|--------------------------|------|-------|------|---------|---------|-------|-----------|
-| Single API (Linear)      | 1    | 9     | 457  | 1,091   | 634     | 58.1% | $1.90     |
-| Three APIs (typical org) | 3    | 32    | 457  | 4,878   | 4,421   | 90.6% | $13.26    |
-| Large org (10 APIs)      | 10   | 277   | 457  | 31,485  | 31,028  | 98.5% | $93.08    |
+| Scenario                 | APIs | Tools | Meta | Full   | Saved  | %     | $/req   | $/user/mo |
+|--------------------------|------|-------|------|--------|--------|-------|---------|-----------|
+| Single API (Linear)      | 1    | 9     | 457  | 1,091  | 634    | 58.1% | $0.0019 | $1.90     |
+| Three APIs (typical org) | 3    | 32    | 457  | 4,878  | 4,421  | 90.6% | $0.013  | $13.26    |
+| Large org (10 APIs)      | 10   | 277   | 457  | 31,485 | 31,028 | 98.5% | $0.093  | $93.08    |
 ```
 
 *Based on ~1,000 requests/user/month at Claude Sonnet 4.5 pricing ($3/1M input tokens).*
@@ -167,7 +167,7 @@ Pass `--report` to drop a timestamped `summary-live-<org>.md` into `evaluate/rep
 
 ### Directory layout
 
-```
+```text
 src/
   shared/
     token-counter.ts        # tiktoken cl100k_base
