@@ -31,25 +31,29 @@ npm run benchmark:code
 When exposing APIs to AI agents via MCP there are two approaches:
 
 - **Full expansion** — every endpoint becomes its own MCP tool. 10 APIs × 30 endpoints = **300 tool definitions** sent on every message.
-- **Meta-tools** — Airlock exposes **4 tools** regardless of how many APIs are connected. The agent discovers specific tools via `search_tools` / `describe_tools` and invokes them through `execute_tool`.
+- **Meta-tools** — Airlock exposes **4 tools** no matter how many APIs are connected. The agent discovers specific tools via `search_tools` / `describe_tools` and invokes them through `execute_tool`.
+
+Two of those four descriptions (`list_services` and `search_tools`) now name the org's connected services inline — capped at 12 names, with an "and N more" suffix — so MCP hosts reliably route discovery to Airlock instead of suggesting a separate connector ([Airlock #1338](https://github.com/Air-Lock-AI/airlock)). That makes the meta-tools footprint grow *modestly* with org size rather than staying a flat constant, but the cap keeps it bounded (≈470–650 tokens) — it never scales with total tool count the way full expansion does. The benchmark builds these two descriptions exactly as the server does, so the `Meta` column below varies per scenario.
 
 ### Sample output
 
 ```text
-📦 Meta-Tools (4 tools):
-  list_services       :     63 tokens
-  search_tools        :    130 tokens
+📦 Meta-Tools (4 tools) — floor (0 services connected):
+  list_services       :     75 tokens  (+ service names, capped at 12)
+  search_tools        :    131 tokens  (+ service names, capped at 12)
   describe_tools      :    120 tokens
   execute_tool        :    144 tokens
-  TOTAL               :    457 tokens
+  TOTAL               :    470 tokens
 
 📊 Benchmark Results:
 | Scenario                 | APIs | Tools | Meta | Full   | Saved  | %     | $/req   | $/user/mo |
 |--------------------------|------|-------|------|--------|--------|-------|---------|-----------|
-| Single API (Linear)      | 1    | 9     | 457  | 1,091  | 634    | 58.1% | $0.0019 | $1.90     |
-| Three APIs (typical org) | 3    | 32    | 457  | 4,878  | 4,421  | 90.6% | $0.013  | $13.26    |
-| Large org (10 APIs)      | 10   | 277   | 457  | 31,485 | 31,028 | 98.5% | $0.093  | $93.08    |
+| Single API (Linear)      | 1    | 9     | 549  | 1,091  | 542    | 49.7% | $0.0016 | $1.63     |
+| Three APIs (typical org) | 3    | 32    | 563  | 4,878  | 4,315  | 88.5% | $0.013  | $12.95    |
+| Large org (10 APIs)      | 10   | 277   | 619  | 31,485 | 30,866 | 98.0% | $0.093  | $92.60    |
 ```
+
+The `Meta` column climbs from ~549 (one service) toward a ~645-token ceiling once 12+ services are connected — the 12-name cap is why a 20-API org costs barely more than a 10-API one. Small orgs see the biggest relative hit (a single 5-tool API now saves ~36% instead of ~47%); for medium-and-larger orgs the extra discovery tokens are a rounding error against full expansion.
 
 *Based on ~1,000 requests/user/month at Claude Sonnet 4.5 pricing ($3/1M input tokens).*
 

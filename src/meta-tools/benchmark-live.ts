@@ -12,7 +12,7 @@
  */
 
 import { parseArgs } from 'util';
-import { countTokens, freeEncoder } from '../shared/token-counter.js';
+import { countTokens, countToolTokens, freeEncoder } from '../shared/token-counter.js';
 import { interactiveAuth, resolveAirlockUrl } from '../shared/oauth.js';
 import { MCPClient } from '../shared/mcp-client.js';
 
@@ -62,9 +62,6 @@ interface LiveBenchmarkResult {
   };
 }
 
-// Meta-tools token count (measured with tiktoken cl100k_base)
-const META_TOOLS_TOKENS = 457;
-
 async function runLiveBenchmark(
   url: string,
   token: string,
@@ -91,6 +88,23 @@ async function runLiveBenchmark(
       '   ⚠️  Warning: Expected meta-tools not found. This may be a project-specific endpoint.\n',
     );
   }
+
+  // Measure the actual meta-tool definitions this host receives. Two of the
+  // four descriptions (list_services / search_tools) now embed the org's
+  // connected-service names, so the footprint is no longer a fixed constant —
+  // count what the server actually returned on tools/list.
+  const metaToolDefinitionsTokens = toolsResult.tools
+    .filter((t) => expectedTools.includes(t.name))
+    .reduce(
+      (sum, t) =>
+        sum +
+        countToolTokens({
+          name: t.name,
+          description: t.description,
+          inputSchema: (t.inputSchema ?? {}) as Record<string, unknown>,
+        }),
+      0,
+    );
 
   console.log('📋 Calling list_services...');
   const listServicesText = await client.callToolText('list_services', {});
@@ -131,7 +145,7 @@ async function runLiveBenchmark(
   const fullExpansionEstimate = totalTools * avgTokensPerTool;
 
   const metaToolsWorkflow =
-    META_TOOLS_TOKENS * 3 +
+    metaToolDefinitionsTokens * 3 +
     listServicesTokens +
     searchToolsTokens +
     describeToolsTokens;
@@ -161,7 +175,7 @@ async function runLiveBenchmark(
       listServicesResponse: listServicesTokens,
       searchToolsResponse: searchToolsTokens,
       describeToolsResponse: describeToolsTokens,
-      metaToolDefinitions: META_TOOLS_TOKENS,
+      metaToolDefinitions: metaToolDefinitionsTokens,
       fullExpansionEstimate,
     },
     fairComparison: {
@@ -199,7 +213,7 @@ function printResult(
 
   console.log('\n📏 Token Measurements:');
   console.log(
-    `   Meta-tool definitions:    ${result.tokenMeasurements.metaToolDefinitions} tokens (constant)`,
+    `   Meta-tool definitions:    ${result.tokenMeasurements.metaToolDefinitions} tokens (measured; grows with connected-service names)`,
   );
   console.log(
     `   list_services response:   ${result.tokenMeasurements.listServicesResponse} tokens`,
