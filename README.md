@@ -157,17 +157,17 @@ This benchmark accounts for the **full workflow overhead** of the meta-tools app
 
 ### Overhead Calculation
 
-Meta-tools workflow total: `(meta-tool defs × 3) + ~250 response tokens`. The definition cost is no longer a flat constant — it grows with the number of connected services (≈549 at one service → ~645 once 12+ services are connected), so the fair-comparison total below varies per scenario instead of sitting at a fixed ~1,621.
+Meta-tools workflow total: `(meta-tool defs × 3) + ~300 response tokens`. The definition cost is no longer a flat constant — it grows with the number of connected services (≈549 at one service → ~645 once 12+ services are connected), so the fair-comparison total below varies per scenario (~1,950–2,235) rather than sitting at a single fixed value.
 
 | Scenario | Full Expansion | Meta-tools (fair) | Difference | $/req | $/user/mo |
 |----------|----------------|-------------------|------------|-------|-----------|
-| Single API (5 tools) | 859 | 1,903 | ❌ +1,044 (meta costs more) | -$0.003 | -$3.13 |
-| Single API (9 tools) | 1,091 | 1,897 | ❌ +806 (meta costs more) | -$0.002 | -$2.42 |
-| Single API (18 tools) | 2,928 | 1,897 | ✅ -1,031 (35% savings) | $0.003 | $3.09 |
-| Three APIs (32 tools) | 4,878 | 1,939 | ✅ -2,939 (60% savings) | $0.009 | $8.82 |
-| Medium org (122 tools) | 14,652 | 1,975 | ✅ -12,677 (87% savings) | $0.038 | $38.03 |
-| Large org (277 tools) | 31,485 | 2,107 | ✅ -29,378 (93% savings) | $0.088 | $88.13 |
-| Enterprise (865 tools) | 95,360 | 2,185 | ✅ -93,175 (98% savings) | $0.280 | $279.53 |
+| Single API (5 tools) | 859 | 1,953 | ❌ +1,094 (meta costs more) | -$0.003 | -$3.28 |
+| Single API (9 tools) | 1,091 | 1,947 | ❌ +856 (meta costs more) | -$0.003 | -$2.57 |
+| Single API (18 tools) | 2,928 | 1,947 | ✅ -981 (34% savings) | $0.003 | $2.94 |
+| Three APIs (32 tools) | 4,878 | 1,989 | ✅ -2,889 (59% savings) | $0.009 | $8.67 |
+| Medium org (122 tools) | 14,652 | 2,025 | ✅ -12,627 (86% savings) | $0.038 | $37.88 |
+| Large org (277 tools) | 31,485 | 2,157 | ✅ -29,328 (93% savings) | $0.088 | $87.98 |
+| Enterprise (865 tools) | 95,360 | 2,235 | ✅ -93,125 (98% savings) | $0.280 | $279.38 |
 
 *Based on ~1,000 requests/user/month and Claude Sonnet 4.5 pricing ($3/1M input tokens)*
 
