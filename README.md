@@ -10,7 +10,7 @@ When exposing APIs to AI agents via MCP, there are two approaches:
 Every API endpoint becomes an individual MCP tool. For an organization with 10 connected APIs averaging 30 endpoints each, the AI receives **300 tool definitions** in every message.
 
 ### Meta-Tools (Airlock's Approach)
-Only **4 tools** are exposed regardless of how many APIs are connected:
+Only **4 tools** are exposed no matter how many APIs are connected:
 
 | Tool | Purpose |
 |------|---------|
@@ -18,6 +18,8 @@ Only **4 tools** are exposed regardless of how many APIs are connected:
 | `search_tools` | Find tools by keyword |
 | `describe_tools` | Get full schema for specific tools |
 | `execute_tool` | Run any tool via `service-slug/tool-name` |
+
+> **Note:** The `list_services` and `search_tools` descriptions now name the org's connected services inline — capped at 12 names, with an "and N more" suffix — so MCP hosts reliably route discovery to Airlock instead of suggesting a separate connector ([Airlock #1338](https://github.com/Air-Lock-AI/airlock)). This makes the meta-tools footprint grow *modestly* with the number of connected services rather than being a flat constant, but the cap keeps it bounded (≈470–650 tokens) — it never scales with total tool count the way full expansion does.
 
 ## Quick Start
 
@@ -36,26 +38,28 @@ npm run benchmark
 ## Sample Output
 
 ```
-📦 Meta-Tools (4 tools):
---------------------------------------------------
-  list_services       :     63 tokens
-  search_tools        :    130 tokens
+📦 Meta-Tools (4 tools) — floor (0 services connected):
+----------------------------------------------------------------
+  list_services       :     75 tokens  (+ service names, capped at 12)
+  search_tools        :    131 tokens  (+ service names, capped at 12)
   describe_tools      :    120 tokens
   execute_tool        :    144 tokens
---------------------------------------------------
-  TOTAL               :    457 tokens
+----------------------------------------------------------------
+  TOTAL               :    470 tokens
 
 📊 Benchmark Results:
 ------------------------------------------------------------------------------------------------------------------------------
 | Scenario                              | APIs | Tools | Meta    | Full      | Saved     | %     | $/req   | $/user/mo |
 |---------------------------------------|------|-------|---------|-----------|-----------|-------|---------|-----------|
-| Single API (Linear)                   | 1    | 9     | 457     | 1,091     | 634       | 58.1% | $0.0019 | $1.90     |
-| Single API (GitHub)                   | 1    | 18    | 457     | 2,928     | 2,471     | 84.4% | $0.0074 | $7.41     |
-| Three APIs (typical org)              | 3    | 32    | 457     | 4,878     | 4,421     | 90.6% | $0.013  | $13.26    |
-| Large org (10 APIs)                   | 10   | 277   | 457     | 31,485    | 31,028    | 98.5% | $0.093  | $93.08    |
+| Single API (Linear)                   | 1    | 9     | 549     | 1,091     | 542       | 49.7% | $0.0016 | $1.63     |
+| Single API (GitHub)                   | 1    | 18    | 549     | 2,928     | 2,379     | 81.3% | $0.0071 | $7.14     |
+| Three APIs (typical org)              | 3    | 32    | 563     | 4,878     | 4,315     | 88.5% | $0.013  | $12.95    |
+| Large org (10 APIs)                   | 10   | 277   | 619     | 31,485    | 30,866    | 98.0% | $0.093  | $92.60    |
 
 *Based on ~1,000 requests/user/month and Claude Sonnet 4.5 pricing ($3/1M input tokens)*
 ```
+
+The `Meta` column is no longer a flat constant — it climbs from ~549 (one service) toward a ~645-token ceiling once 12+ services are connected. Small orgs see the biggest relative hit (a single 5-tool API now saves ~36% instead of ~47%); for medium-and-larger orgs the extra discovery tokens are a rounding error against full expansion.
 
 ## Output Formats
 
@@ -114,18 +118,18 @@ If OAuth fails (e.g., firewall blocking localhost), it falls back to manual toke
    Total: 32 tools
 
 📏 Token Measurements:
-   Meta-tool definitions:    457 tokens (constant)
+   Meta-tool definitions:    563 tokens (measured; grows with connected-service names)
    list_services response:   180 tokens
    search_tools response:    250 tokens
    describe_tools response:  320 tokens
    Full expansion estimate:  4,480 tokens
 
 ⚖️  Fair Comparison:
-   Meta-tools workflow:  2,028 tokens
+   Meta-tools workflow:  2,439 tokens
    Full expansion:       4,480 tokens
-   Savings:              2,452 tokens (54.7%)
+   Savings:              2,041 tokens (45.6%)
 
-💡 🟢 Meta-tools recommended - good savings
+💡 🟡 Meta-tools slightly better - marginal savings
 ```
 
 ## Using Your Own OpenAPI Specs
@@ -153,28 +157,28 @@ This benchmark accounts for the **full workflow overhead** of the meta-tools app
 
 ### Overhead Calculation
 
-Meta-tools workflow total: `(457 × 3) + 250 response tokens ≈ 1,621 tokens`
+Meta-tools workflow total: `(meta-tool defs × 3) + ~250 response tokens`. The definition cost is no longer a flat constant — it grows with the number of connected services (≈549 at one service → ~645 once 12+ services are connected), so the fair-comparison total below varies per scenario instead of sitting at a fixed ~1,621.
 
 | Scenario | Full Expansion | Meta-tools (fair) | Difference | $/req | $/user/mo |
 |----------|----------------|-------------------|------------|-------|-----------|
-| Single API (5 tools) | 859 | 1,621 | ❌ +762 (meta costs more) | -$0.002 | -$2.29 |
-| Single API (9 tools) | 1,091 | 1,621 | ❌ +530 (meta costs more) | -$0.002 | -$1.59 |
-| Single API (18 tools) | 2,928 | 1,621 | ✅ -1,307 (45% savings) | $0.004 | $3.92 |
-| Three APIs (32 tools) | 4,878 | 1,621 | ✅ -3,257 (67% savings) | $0.010 | $9.77 |
-| Medium org (122 tools) | 14,652 | 1,621 | ✅ -13,031 (89% savings) | $0.039 | $39.09 |
-| Large org (277 tools) | 31,485 | 1,621 | ✅ -29,864 (95% savings) | $0.090 | $89.59 |
-| Enterprise (865 tools) | 95,360 | 1,621 | ✅ -93,739 (98% savings) | $0.281 | $281.22 |
+| Single API (5 tools) | 859 | 1,903 | ❌ +1,044 (meta costs more) | -$0.003 | -$3.13 |
+| Single API (9 tools) | 1,091 | 1,897 | ❌ +806 (meta costs more) | -$0.002 | -$2.42 |
+| Single API (18 tools) | 2,928 | 1,897 | ✅ -1,031 (35% savings) | $0.003 | $3.09 |
+| Three APIs (32 tools) | 4,878 | 1,939 | ✅ -2,939 (60% savings) | $0.009 | $8.82 |
+| Medium org (122 tools) | 14,652 | 1,975 | ✅ -12,677 (87% savings) | $0.038 | $38.03 |
+| Large org (277 tools) | 31,485 | 2,107 | ✅ -29,378 (93% savings) | $0.088 | $88.13 |
+| Enterprise (865 tools) | 95,360 | 2,185 | ✅ -93,175 (98% savings) | $0.280 | $279.53 |
 
 *Based on ~1,000 requests/user/month and Claude Sonnet 4.5 pricing ($3/1M input tokens)*
 
-**Break-even point**: ~12-15 total tools (typically 2 APIs)
+**Break-even point**: ~15-18 total tools (typically 2-3 APIs)
 
 ## When to Use Each Approach
 
 | Scenario | Tools | Recommendation | Fair Comparison |
 |----------|-------|----------------|-----------------|
-| Single small API | <10 | Full expansion | Meta costs ~600 more tokens |
-| Single medium API | 10-20 | Either works | Roughly break-even |
+| Single small API | <10 | Full expansion | Meta costs ~800-1,000 more tokens |
+| Single medium API | 10-20 | Either works | Roughly break-even (~15-18 tools) |
 | 2-3 APIs | 20-40 | Meta-tools | Saves 50-70% |
 | 5+ APIs | 50-150 | Meta-tools | Saves 80-90% |
 | Enterprise (10+ APIs) | 200+ | Meta-tools essential | Saves 95%+ |
