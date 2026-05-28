@@ -70,75 +70,144 @@ const MONTHLY_REQUESTS_PER_USER = 1_000;
 
 // ============================================================================
 // Meta-Tools Definition
+//
+// Airlock's `list_services` and `search_tools` descriptions are built
+// dynamically from the org's connected service names (Airlock PR #1338, "fix:
+// agents now reliably find your connected services"). Naming the services
+// inline makes MCP hosts route discovery to Airlock instead of suggesting a
+// separate connector. The names are capped at 12 with an "and N more" suffix,
+// so the meta-tools footprint grows with org size but stays bounded — it is no
+// longer the flat constant this benchmark used to assume. `describe_tools` and
+// `execute_tool` carry no service names and stay fixed.
+//
+// The builders below mirror the server's logic so the simulated numbers track
+// the real tool definitions the host receives on `initialize` / `tools/list`.
 // ============================================================================
 
-const META_TOOLS: MCPTool[] = [
-  {
-    name: 'list_services',
-    description:
-      'List all connected services/projects in the organization. Returns service names, slugs, tool counts, and sample tools.',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-      required: [],
-    },
-  },
-  {
-    name: 'search_tools',
-    description:
-      'Search for tools by keyword across all connected services. Returns matching tools with names, descriptions, and project info.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        query: {
-          type: 'string',
-          description: 'Search query to match against tool names and descriptions',
-        },
-        limit: {
-          type: 'number',
-          description: 'Maximum number of results to return (default: 20)',
-        },
+// Matches META_TOOL_DESCRIPTION_NAME_CAP in Airlock's meta-tools.ts.
+const META_TOOL_DESCRIPTION_NAME_CAP = 12;
+
+const LIST_SERVICES_DESCRIPTION_FALLBACK =
+  'List all connected services (APIs) available in this organization. Call this first to discover what services are available, then use search_tools to find specific tools within a service.';
+
+const SEARCH_TOOLS_DESCRIPTION_FALLBACK =
+  'Search for available tools across all connected services in this organization. Use this to discover tools by keyword before executing them.';
+
+function formatServiceNamesForDescription(names: string[]): string {
+  const shown = names.slice(0, META_TOOL_DESCRIPTION_NAME_CAP);
+  const remaining = names.length - shown.length;
+  const joined = shown.join(', ');
+  return remaining > 0 ? `${joined}, and ${remaining} more` : joined;
+}
+
+function buildListServicesDescription(serviceNames: string[]): string {
+  if (serviceNames.length === 0) {
+    return LIST_SERVICES_DESCRIPTION_FALLBACK;
+  }
+  const names = formatServiceNamesForDescription(serviceNames);
+  return (
+    `List the services (APIs) already connected to this organization — including ${names}. ` +
+    "Call this first to discover what's available. These services are usable right now through Airlock, " +
+    'so do NOT tell the user a capability is missing or suggest installing a separate connector/integration ' +
+    'before checking here. Then use search_tools to find specific tools within a service.'
+  );
+}
+
+function buildSearchToolsDescription(serviceNames: string[]): string {
+  if (serviceNames.length === 0) {
+    return SEARCH_TOOLS_DESCRIPTION_FALLBACK;
+  }
+  const names = formatServiceNamesForDescription(serviceNames);
+  return (
+    `Search for tools across all services connected to this organization — including ${names} — ` +
+    'by keyword before executing them. If the user asks for a capability that maps to one of these ' +
+    '(e.g. Notion, GitHub, Linear), search here first rather than suggesting they install a separate ' +
+    'connector or integration; it is already connected through Airlock.'
+  );
+}
+
+/** Sort service names the way the server does before embedding them. */
+function sortServiceNames(names: string[]): string[] {
+  return [...names].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+}
+
+/**
+ * Build the four meta-tool definitions for an org with the given connected
+ * service names. `list_services` / `search_tools` embed the (sorted, capped)
+ * names; the other two are static. Pass `[]` for the generic-fallback floor.
+ */
+function buildMetaTools(serviceNames: string[]): MCPTool[] {
+  const sorted = sortServiceNames(serviceNames);
+  return [
+    {
+      name: 'list_services',
+      description: buildListServicesDescription(sorted),
+      inputSchema: {
+        type: 'object',
+        properties: {},
+        required: [],
       },
-      required: ['query'],
     },
-  },
-  {
-    name: 'describe_tools',
-    description:
-      'Get detailed information and input schemas for specific tools. Use after search_tools to get full schemas before executing.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        tools: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Array of tool names to describe (use namespaced format: project-slug/tool-name)',
+    {
+      name: 'search_tools',
+      description: buildSearchToolsDescription(sorted),
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'Search query to match against tool names and descriptions',
+          },
+          limit: {
+            type: 'number',
+            description: 'Maximum number of results to return (default: 20)',
+          },
         },
+        required: ['query'],
       },
-      required: ['tools'],
     },
-  },
-  {
-    name: 'execute_tool',
-    description:
-      'Execute a tool from any connected service in the organization. Use namespaced format: "project-slug/tool-name".',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        tool: {
-          type: 'string',
-          description: 'The namespaced tool name (e.g., "linear/create_issue", "github/create_pr")',
+    {
+      name: 'describe_tools',
+      description:
+        'Get detailed information and input schemas for specific tools. Use after search_tools to get full schemas before executing.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          tools: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Array of tool names to describe (use namespaced format: project-slug/tool-name)',
+          },
         },
-        arguments: {
-          type: 'object',
-          additionalProperties: true,
-          description: 'Arguments to pass to the tool',
-        },
+        required: ['tools'],
       },
-      required: ['tool'],
     },
-  },
-];
+    {
+      name: 'execute_tool',
+      description:
+        'Execute a tool from any connected service in the organization. Use namespaced format: "project-slug/tool-name".',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          tool: {
+            type: 'string',
+            description: 'The namespaced tool name (e.g., "linear/create_issue", "github/create_pr")',
+          },
+          arguments: {
+            type: 'object',
+            additionalProperties: true,
+            description: 'Arguments to pass to the tool',
+          },
+        },
+        required: ['tool'],
+      },
+    },
+  ];
+}
+
+// Generic-fallback floor (no services connected) — the smallest the meta-tools
+// can be. Used for the per-tool breakdown reference; real scenarios embed names.
+const BASE_META_TOOLS: MCPTool[] = buildMetaTools([]);
 
 // ============================================================================
 // OpenAPI to MCP Tool Conversion
@@ -295,7 +364,10 @@ function runBenchmark(
   scenario: string,
   specs: Array<{ name: string; spec: OpenAPISpec }>
 ): BenchmarkResult {
-  const metaToolsTokens = META_TOOLS.reduce((sum, tool) => sum + countToolTokens(tool), 0);
+  // The meta-tools footprint depends on this scenario's connected services:
+  // their names are embedded (capped at 12) into two of the four descriptions.
+  const metaTools = buildMetaTools(specs.map(({ name }) => name));
+  const metaToolsTokens = metaTools.reduce((sum, tool) => sum + countToolTokens(tool), 0);
 
   let totalTools = 0;
   let fullExpansionTokens = 0;
@@ -358,7 +430,22 @@ function formatMonthlyCost(dollars: number): string {
 
 function printResults(results: BenchmarkResult[], format: 'terminal' | 'json' | 'markdown'): void {
   if (format === 'json') {
-    console.log(JSON.stringify({ results, meta: { metaTools: META_TOOLS } }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          results,
+          meta: {
+            // Per-scenario meta-tool token cost is in each result's
+            // `metaToolsTokens`; it grows as connected-service names are embedded
+            // into the list_services / search_tools descriptions (capped at 12).
+            nameCap: META_TOOL_DESCRIPTION_NAME_CAP,
+            baseMetaTools: BASE_META_TOOLS,
+          },
+        },
+        null,
+        2
+      )
+    );
     return;
   }
 
@@ -375,16 +462,21 @@ function printTerminal(results: BenchmarkResult[]): void {
   console.log('AIRLOCK META-TOOLS TOKEN SAVINGS BENCHMARK');
   console.log('='.repeat(100));
 
-  // Meta-tools breakdown
-  console.log('\n📦 Meta-Tools (4 tools):');
-  console.log('-'.repeat(50));
+  // Meta-tools breakdown. list_services / search_tools embed the org's
+  // connected-service names (capped at 12), so they grow with org size; the
+  // figures below are the generic-fallback floor (no services connected). The
+  // per-scenario totals are in the Meta column of the results table.
+  const growsWithOrg = new Set(['list_services', 'search_tools']);
+  console.log('\n📦 Meta-Tools (4 tools) — floor (0 services connected):');
+  console.log('-'.repeat(64));
   let totalMetaTokens = 0;
-  for (const tool of META_TOOLS) {
+  for (const tool of BASE_META_TOOLS) {
     const tokens = countToolTokens(tool);
     totalMetaTokens += tokens;
-    console.log(`  ${tool.name.padEnd(20)}: ${formatNumber(tokens).padStart(6)} tokens`);
+    const note = growsWithOrg.has(tool.name) ? '  (+ service names, capped at 12)' : '';
+    console.log(`  ${tool.name.padEnd(20)}: ${formatNumber(tokens).padStart(6)} tokens${note}`);
   }
-  console.log('-'.repeat(50));
+  console.log('-'.repeat(64));
   console.log(`  ${'TOTAL'.padEnd(20)}: ${formatNumber(totalMetaTokens).padStart(6)} tokens`);
 
   // Results table
@@ -471,15 +563,22 @@ function printMarkdown(results: BenchmarkResult[]): void {
   console.log('# Airlock Meta-Tools Token Savings Benchmark\n');
 
   console.log('## Meta-Tools Definition (4 tools)\n');
-  console.log('| Tool | Tokens |');
-  console.log('|------|--------|');
+  console.log(
+    '`list_services` and `search_tools` embed the org\'s connected-service names ' +
+      '(capped at 12) so MCP hosts route discovery to Airlock; their size grows with ' +
+      'org size. Figures below are the generic-fallback floor (no services connected) — ' +
+      'see the Meta Tokens column for per-scenario totals.\n'
+  );
+  const growsWithOrg = new Set(['list_services', 'search_tools']);
+  console.log('| Tool | Tokens (floor) | Grows with org? |');
+  console.log('|------|----------------|-----------------|');
   let totalMetaTokens = 0;
-  for (const tool of META_TOOLS) {
+  for (const tool of BASE_META_TOOLS) {
     const tokens = countToolTokens(tool);
     totalMetaTokens += tokens;
-    console.log(`| ${tool.name} | ${tokens} |`);
+    console.log(`| ${tool.name} | ${tokens} | ${growsWithOrg.has(tool.name) ? 'yes' : 'no'} |`);
   }
-  console.log(`| **TOTAL** | **${totalMetaTokens}** |\n`);
+  console.log(`| **TOTAL** | **${totalMetaTokens}** | |\n`);
 
   console.log('## Benchmark Results\n');
   console.log('*Based on ~1,000 requests/user/month and Claude Sonnet 4.5 pricing ($3/1M input tokens)*\n');
